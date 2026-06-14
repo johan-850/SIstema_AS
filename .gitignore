@@ -1,0 +1,55 @@
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.iml
+
+# Environment
+.env
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Android
+android/.gradle/
+android/captures/
+android/local.properties
+android/key.properties
+*.keystore
+*.jks
+google-services.json
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/.last_build_id
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+GoogleService-Info.plist
+
+# macOS
+macos/Flutter/GeneratedPluginRegistrant.swift
+
+# Code coverage
+coverage/
+lcov.info
+
+# Build artifacts
+*.apk
+*.ipa
+*.aab
+*.app
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Logs
+*.log

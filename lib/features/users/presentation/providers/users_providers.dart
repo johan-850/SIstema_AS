@@ -81,16 +81,22 @@ class CashierListNotifier extends StateNotifier<CashierListState> {
   }
 
   Future<bool> toggleStatus(String cashierId, bool isActive) async {
-    final result = await _toggleStatus(cashierId: cashierId, isActive: isActive);
-    if (result.failure != null) {
-      state = state.copyWith(failure: result.failure);
-      return false;
-    }
-    final updated = state.cashiers
+    // Optimistic update: refleja el cambio en UI de inmediato
+    final optimistic = state.cashiers
         .map((c) => c.id == cashierId ? c.copyWith(isActive: isActive) : c)
         .toList();
+    state = state.copyWith(cashiers: optimistic);
+
+    final result = await _toggleStatus(cashierId: cashierId, isActive: isActive);
+    if (result.failure != null) {
+      // Revertir si hubo error real en BD
+      final reverted = state.cashiers
+          .map((c) => c.id == cashierId ? c.copyWith(isActive: !isActive) : c)
+          .toList();
+      state = state.copyWith(cashiers: reverted, failure: result.failure);
+      return false;
+    }
     state = state.copyWith(
-      cashiers: updated,
       successMessage: isActive ? 'Cajero activado correctamente' : 'Cajero desactivado correctamente',
     );
     return true;
@@ -106,8 +112,10 @@ class CashierListNotifier extends StateNotifier<CashierListState> {
     return true;
   }
 
-  Future<({String? csv, Failure? failure})> exportCSV() =>
-      _repo.exportCashiersToCSV();
+  Future<({String? csv, Failure? failure})> exportCSV() async {
+    final result = await _repo.exportCashiersToCSV();
+    return (csv: result.csvContent, failure: result.failure);
+  }
 }
 
 final cashierListProvider =

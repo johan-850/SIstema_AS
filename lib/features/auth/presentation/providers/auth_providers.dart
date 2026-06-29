@@ -82,6 +82,6 @@ class LoginNotifier extends StateNotifier<LoginState> {
   void clearError() => state = state.copyWith(failure: null);
 }
 
-final loginProvider = StateNotifierProvider.autoDispose<LoginNotifier, LoginState>(
+final loginProvider = StateNotifierProvider<LoginNotifier, LoginState>(
   (ref) => LoginNotifier(ref.read(loginUseCaseProvider)),
 );

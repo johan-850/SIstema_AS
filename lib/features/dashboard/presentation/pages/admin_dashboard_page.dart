@@ -43,7 +43,7 @@ class AdminDashboardPage extends ConsumerWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.wave, color: AppColors.primary),
+                    const Icon(Icons.waving_hand_rounded, color: AppColors.primary),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -146,15 +146,23 @@ class _AdminDrawer extends StatelessWidget {
             const Text('Abarrotería Pro', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
             Text(userName, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
             const Divider(height: 32),
-            _drawerItem(context, Icons.dashboard_rounded, 'Dashboard', '/admin'),
-            _drawerItem(context, Icons.people_rounded, 'Cajeros', '/admin/users'),
-            _drawerItem(context, Icons.inventory_2_outlined, 'Productos', '/admin/products'),
-            _drawerItem(context, Icons.bar_chart_rounded, 'Inventario', '/admin/inventory'),
-            _drawerItem(context, Icons.receipt_long_rounded, 'Reportes', '/admin/reports'),
-            _drawerItem(context, Icons.analytics_rounded, 'Estadísticas', '/admin/analytics'),
-            const Spacer(),
+            // Wrapped in Expanded+ListView to prevent Column overflow
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  _drawerItem(context, Icons.dashboard_rounded, 'Dashboard', '/admin'),
+                  _drawerItem(context, Icons.people_rounded, 'Cajeros', '/admin/users'),
+                  _drawerItem(context, Icons.inventory_2_outlined, 'Productos', '/admin/products'),
+                  _drawerItem(context, Icons.bar_chart_rounded, 'Inventario', '/admin/inventory'),
+                  _drawerItem(context, Icons.receipt_long_rounded, 'Reportes', '/admin/reports'),
+                  _drawerItem(context, Icons.analytics_rounded, 'Estadísticas', '/admin/analytics'),
+                ],
+              ),
+            ),
             const Divider(),
             _drawerItem(context, Icons.settings_outlined, 'Configuración', '/settings'),
+            const SizedBox(height: 8),
           ],
         ),
       ),

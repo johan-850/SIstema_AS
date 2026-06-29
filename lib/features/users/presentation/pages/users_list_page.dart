@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
+import 'dart:convert';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/confirmation_dialog.dart';
@@ -120,11 +120,15 @@ class _UsersListPageState extends ConsumerState<UsersListPage> {
       if (context.mounted) AppSnackbar.error(context, result.failure!.message);
       return;
     }
-    // Guardar y compartir
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/cajeros_${DateTime.now().millisecondsSinceEpoch}.csv');
-    await file.writeAsString(result.csv!);
-    await Share.shareXFiles([XFile(file.path)], text: 'Exportación de cajeros — Abarrotería Pro');
+    // Descarga directa en el navegador (compatible con web)
+    final bytes = utf8.encode(result.csv!);
+    final blob = html.Blob([bytes], 'text/csv;charset=utf-8');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    html.AnchorElement(href: url)
+      ..setAttribute('download', 'cajeros_${DateTime.now().millisecondsSinceEpoch}.csv')
+      ..click();
+    html.Url.revokeObjectUrl(url);
+    if (context.mounted) AppSnackbar.success(context, 'CSV descargado correctamente');
   }
 }
 

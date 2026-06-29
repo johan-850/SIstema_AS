@@ -145,7 +145,6 @@ class _LoginPageState extends ConsumerState<LoginPage>
         children: [
           // ── Email ────────────────────────────────────────
           TextFormField(
-            id: 'login_email_field',
             controller: _emailCtrl,
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
@@ -159,7 +158,6 @@ class _LoginPageState extends ConsumerState<LoginPage>
           const SizedBox(height: 16),
           // ── Contraseña ────────────────────────────────────
           TextFormField(
-            id: 'login_password_field',
             controller: _passCtrl,
             obscureText: _obscure,
             textInputAction: TextInputAction.done,
@@ -210,9 +208,11 @@ class _LoginPageState extends ConsumerState<LoginPage>
               children: [
                 const Icon(Icons.info_outline_rounded, size: 15, color: AppColors.textSecondary),
                 const SizedBox(width: 8),
-                Text(
-                  'El acceso se gestiona según tu rol asignado',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12),
+                Flexible(
+                  child: Text(
+                    'El acceso se gestiona según tu rol asignado',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 12),
+                  ),
                 ),
               ],
             ),

@@ -35,12 +35,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutes.login,
     redirect: (context, state) {
-      final isLoggedIn = authStream.valueOrNull != null;
+      // Si el stream aún está cargando, no redirigir todavía
+      if (authStream.isLoading) return null;
+
+      final user = authStream.valueOrNull;
+      final isLoggedIn = user != null;
       final isLoginPage = state.matchedLocation == AppRoutes.login;
 
       if (!isLoggedIn && !isLoginPage) return AppRoutes.login;
       if (isLoggedIn && isLoginPage) {
-        final role = ref.read(currentUserRoleProvider);
+        // Leer el rol directamente del usuario ya cargado (evita race condition)
+        final role = user.role;
         return role == 'adminmaster'
             ? AppRoutes.adminDashboard
             : AppRoutes.cashRegisterOpening;

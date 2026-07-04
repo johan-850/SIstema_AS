@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/dashboard/presentation/pages/admin_dashboard_page.dart';
+import '../../features/dashboard/presentation/pages/admin_cash_registers_page.dart';
 import '../../features/cash_register/presentation/pages/cash_register_opening_page.dart';
 import '../../features/pos/presentation/pages/pos_page.dart';
 import '../../features/users/presentation/pages/users_list_page.dart';
@@ -14,19 +15,21 @@ import '../../features/settings/presentation/pages/settings_page.dart';
 
 // ── Rutas nombradas ─────────────────────────────────────────
 abstract class AppRoutes {
-  static const login = '/login';
-  static const adminDashboard = '/admin';
-  static const cashRegisterOpening = '/cash-register/opening';
-  static const pos = '/pos';
-  static const products = '/admin/products';
-  static const inventory = '/admin/inventory';
-  static const users = '/admin/users';
-  static const createCashier = '/admin/users/create';
-  static const cashierDetail = '/admin/users/:id';
-  static const settings = '/settings';
-  static const reports = '/admin/reports';
-  static const analytics = '/admin/analytics';
+  static const login                = '/login';
+  static const adminDashboard       = '/admin';
+  static const cashRegisterOpening  = '/cash-register/opening';
+  static const cashRegistersHistory = '/admin/cash-registers';   // US-011
+  static const pos                  = '/pos';
+  static const products             = '/admin/products';
+  static const inventory            = '/admin/inventory';
+  static const users                = '/admin/users';
+  static const createCashier        = '/admin/users/create';
+  static const cashierDetail        = '/admin/users/:id';
+  static const settings             = '/settings';
+  static const reports              = '/admin/reports';
+  static const analytics            = '/admin/analytics';
 }
+
 
 // ── Provider del router ─────────────────────────────────────
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -56,32 +59,38 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.login,
         name: 'login',
-        builder: (_, __) => const LoginPage(),
+        builder: (_, _) => const LoginPage(),
       ),
       GoRoute(
         path: AppRoutes.adminDashboard,
         name: 'admin-dashboard',
-        builder: (_, __) => const AdminDashboardPage(),
+        builder: (_, _) => const AdminDashboardPage(),
       ),
       GoRoute(
         path: AppRoutes.cashRegisterOpening,
         name: 'cash-register-opening',
-        builder: (_, __) => const CashRegisterOpeningPage(),
+        builder: (_, _) => const CashRegisterOpeningPage(),
+      ),
+      // US-011: Historial de aperturas (solo AdminMaster)
+      GoRoute(
+        path: AppRoutes.cashRegistersHistory,
+        name: 'cash-registers-history',
+        builder: (_, _) => const AdminCashRegistersPage(),
       ),
       GoRoute(
         path: AppRoutes.pos,
         name: 'pos',
-        builder: (_, __) => const PosPage(),
+        builder: (_, _) => const PosPage(),
       ),
       GoRoute(
         path: AppRoutes.users,
         name: 'users',
-        builder: (_, __) => const UsersListPage(),
+        builder: (_, _) => const UsersListPage(),
       ),
       GoRoute(
         path: AppRoutes.createCashier,
         name: 'create-cashier',
-        builder: (_, __) => const CreateCashierPage(),
+        builder: (_, _) => const CreateCashierPage(),
       ),
       GoRoute(
         path: AppRoutes.cashierDetail,
@@ -91,9 +100,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.settings,
         name: 'settings',
-        builder: (_, __) => const SettingsPage(),
+        builder: (_, _) => const SettingsPage(),
       ),
     ],
+
+
     errorBuilder: (_, state) => Scaffold(
       body: Center(child: Text('Ruta no encontrada: ${state.error}')),
     ),

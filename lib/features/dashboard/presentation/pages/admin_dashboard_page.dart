@@ -152,12 +152,17 @@ class _AdminDrawer extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 children: [
                   _drawerItem(context, Icons.dashboard_rounded, 'Dashboard', '/admin'),
+                  const _DrawerSectionLabel('Turno y Caja'),
+                  _drawerItem(context, Icons.point_of_sale_rounded, 'Historial de Cajas', '/admin/cash-registers'),
+                  const _DrawerSectionLabel('Tienda'),
                   _drawerItem(context, Icons.people_rounded, 'Cajeros', '/admin/users'),
                   _drawerItem(context, Icons.inventory_2_outlined, 'Productos', '/admin/products'),
                   _drawerItem(context, Icons.bar_chart_rounded, 'Inventario', '/admin/inventory'),
+                  const _DrawerSectionLabel('Reportes'),
                   _drawerItem(context, Icons.receipt_long_rounded, 'Reportes', '/admin/reports'),
                   _drawerItem(context, Icons.analytics_rounded, 'Estadísticas', '/admin/analytics'),
                 ],
+
               ),
             ),
             const Divider(),
@@ -180,3 +185,26 @@ class _AdminDrawer extends StatelessWidget {
     );
   }
 }
+
+/// Etiqueta de sección en el Drawer del Admin
+class _DrawerSectionLabel extends StatelessWidget {
+  final String label;
+  const _DrawerSectionLabel(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Text(
+        label.toUpperCase(),
+        style: const TextStyle(
+          color: AppColors.textDisabled,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.4,
+        ),
+      ),
+    );
+  }
+}
+

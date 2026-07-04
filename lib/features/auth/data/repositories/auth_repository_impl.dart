@@ -2,7 +2,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../domain/entities/app_user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_remote_datasource.dart';
-import '../models/app_user_model.dart';
 import '../../../../core/errors/failures.dart';
 
 /// Implementación concreta del AuthRepository usando Supabase

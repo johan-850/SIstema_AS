@@ -8,6 +8,8 @@ import '../../features/dashboard/presentation/pages/admin_dashboard_page.dart';
 import '../../features/dashboard/presentation/pages/admin_cash_registers_page.dart';
 import '../../features/cash_register/presentation/pages/cash_register_opening_page.dart';
 import '../../features/pos/presentation/pages/pos_page.dart';
+import '../../features/products/presentation/pages/products_list_page.dart';
+import '../../features/products/presentation/pages/product_form_page.dart';
 import '../../features/users/presentation/pages/users_list_page.dart';
 import '../../features/users/presentation/pages/create_cashier_page.dart';
 import '../../features/users/presentation/pages/cashier_detail_page.dart';
@@ -101,6 +103,24 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.settings,
         name: 'settings',
         builder: (_, _) => const SettingsPage(),
+      ),
+      // EP-03: CRUD de Productos
+      GoRoute(
+        path: AppRoutes.products,
+        name: 'products',
+        builder: (_, _) => const ProductsListPage(),
+      ),
+      GoRoute(
+        path: '/admin/products/new',
+        name: 'product-new',
+        builder: (_, _) => const ProductFormPage(),
+      ),
+      GoRoute(
+        path: '/admin/products/edit/:id',
+        name: 'product-edit',
+        builder: (_, state) => ProductFormPage(
+          productId: state.pathParameters['id'],
+        ),
       ),
     ],
 

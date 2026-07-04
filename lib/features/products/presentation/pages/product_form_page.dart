@@ -218,6 +218,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   Row(
                     children: [
                       Expanded(
+                        flex: 3,
                         child: DropdownButtonFormField<String>(
                           initialValue: AppConstants.productCategories.contains(_selectedCategory)
                               ? _selectedCategory
@@ -229,14 +230,14 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                             prefixIcon: Icon(Icons.category_outlined),
                           ),
                           items: AppConstants.productCategories
-                              .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                              .map((c) => DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis)))
                               .toList(),
                           onChanged: (v) => setState(() => _selectedCategory = v ?? 'General'),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        width: 130,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
                         child: DropdownButtonFormField<String>(
                           initialValue: _selectedUnit,
                           dropdownColor: AppColors.surfaceElevated,
@@ -244,9 +245,11 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                           decoration: const InputDecoration(
                             labelText: 'Unidad',
                             prefixIcon: Icon(Icons.straighten_rounded),
+                            isDense: true,
                           ),
+                          isExpanded: true,
                           items: AppConstants.productUnits
-                              .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                              .map((u) => DropdownMenuItem(value: u, child: Text(u, overflow: TextOverflow.ellipsis)))
                               .toList(),
                           onChanged: (v) => setState(() => _selectedUnit = v ?? 'unidad'),
                         ),

@@ -30,7 +30,8 @@ class ProductFormPage extends ConsumerStatefulWidget {
 
 class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   final _formKey = GlobalKey<FormState>();
-  final _currencyFmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+  final _currencyFmt =
+      NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
 
   // Controladores de texto
   late final TextEditingController _nameCtrl;
@@ -43,6 +44,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   late final TextEditingController _imageUrlCtrl;
   late final TextEditingController _supplierCtrl;
 
+  // Valores de los dropdowns — siempre inicializados a algo válido
   String _selectedCategory = AppConstants.productCategories.first;
   String _selectedUnit = AppConstants.productUnits.first;
   bool _isActive = true;
@@ -72,9 +74,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   Future<void> _loadProduct() async {
     setState(() => _isLoadingProduct = true);
 
-    final result = await ref
-        .read(productRepositoryProvider)
-        .getProductById(widget.productId!);
+    final result =
+        await ref.read(productRepositoryProvider).getProductById(widget.productId!);
 
     if (result.product != null) {
       final p = result.product!;
@@ -88,14 +89,14 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       _minStockCtrl.text = p.minStock.toString();
       _imageUrlCtrl.text = p.imageUrl ?? '';
       _supplierCtrl.text = p.supplier ?? '';
-      _selectedCategory = p.category;
-      _selectedUnit = p.unit;
+      // Asegurar que el valor del dropdown exista en la lista
+      _selectedCategory = AppConstants.productCategories.contains(p.category)
+          ? p.category
+          : AppConstants.productCategories.first;
+      _selectedUnit = AppConstants.productUnits.contains(p.unit)
+          ? p.unit
+          : AppConstants.productUnits.first;
       _isActive = p.isActive;
-
-      // Si la categoría del producto no está en la lista, agregarla
-      if (!AppConstants.productCategories.contains(p.category)) {
-        // Se maneja en el dropdown como valor custom
-      }
     } else if (result.failure != null) {
       if (mounted) {
         AppSnackbar.error(context, result.failure!.message);
@@ -133,7 +134,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
           context,
           _isEditMode ? 'Producto actualizado' : 'Producto creado exitosamente',
         );
-        // Refrescar la lista y volver
         ref.read(productListProvider.notifier).refresh();
         context.go('/admin/products');
       }
@@ -162,14 +162,15 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         ],
       ),
       body: _isLoadingProduct
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary))
           : Form(
               key: _formKey,
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
                 children: [
                   // ── Sección: Información Básica ──
-                  _SectionHeader(
+                  const _SectionHeader(
                     icon: Icons.info_outline_rounded,
                     label: 'Información Básica',
                   ),
@@ -180,6 +181,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                     controller: _nameCtrl,
                     style: const TextStyle(color: AppColors.textPrimary),
                     maxLength: AppConstants.maxProductNameLength,
+                    textCapitalization: TextCapitalization.sentences,
                     decoration: const InputDecoration(
                       labelText: 'Nombre del producto *',
                       prefixIcon: Icon(Icons.label_outline_rounded),
@@ -187,18 +189,19 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                     validator: (v) =>
                         v == null || v.trim().isEmpty ? 'El nombre es obligatorio' : null,
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
 
                   // Código de barras
                   TextFormField(
                     controller: _barcodeCtrl,
                     style: const TextStyle(color: AppColors.textPrimary),
+                    keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
                       labelText: 'Código de barras (opcional)',
                       prefixIcon: Icon(Icons.qr_code_2_rounded),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
 
                   // Descripción
                   TextFormField(
@@ -206,33 +209,41 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                     style: const TextStyle(color: AppColors.textPrimary),
                     maxLength: AppConstants.maxDescriptionLength,
                     maxLines: 3,
+                    textCapitalization: TextCapitalization.sentences,
                     decoration: const InputDecoration(
                       labelText: 'Descripción (opcional)',
                       prefixIcon: Icon(Icons.description_outlined),
                       alignLabelWithHint: true,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
 
-                  // Categoría y Unidad (row)
+                  // ── Categoría y Unidad (row) ──
+                  // Usamos value: en lugar de initialValue: (que no existe en Dropdown)
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         flex: 3,
                         child: DropdownButtonFormField<String>(
-                          initialValue: AppConstants.productCategories.contains(_selectedCategory)
-                              ? _selectedCategory
-                              : null,
+                          initialValue: _selectedCategory,
                           dropdownColor: AppColors.surfaceElevated,
-                          style: const TextStyle(color: AppColors.textPrimary),
+                          isExpanded: true,
+                          style: const TextStyle(
+                              color: AppColors.textPrimary, fontSize: 14),
                           decoration: const InputDecoration(
                             labelText: 'Categoría',
                             prefixIcon: Icon(Icons.category_outlined),
                           ),
                           items: AppConstants.productCategories
-                              .map((c) => DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis)))
+                              .map((c) => DropdownMenuItem(
+                                    value: c,
+                                    child: Text(c,
+                                        overflow: TextOverflow.ellipsis),
+                                  ))
                               .toList(),
-                          onChanged: (v) => setState(() => _selectedCategory = v ?? 'General'),
+                          onChanged: (v) =>
+                              setState(() => _selectedCategory = v ?? AppConstants.productCategories.first),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -241,17 +252,22 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                         child: DropdownButtonFormField<String>(
                           initialValue: _selectedUnit,
                           dropdownColor: AppColors.surfaceElevated,
-                          style: const TextStyle(color: AppColors.textPrimary),
+                          isExpanded: true,
+                          style: const TextStyle(
+                              color: AppColors.textPrimary, fontSize: 14),
                           decoration: const InputDecoration(
                             labelText: 'Unidad',
                             prefixIcon: Icon(Icons.straighten_rounded),
-                            isDense: true,
                           ),
-                          isExpanded: true,
                           items: AppConstants.productUnits
-                              .map((u) => DropdownMenuItem(value: u, child: Text(u, overflow: TextOverflow.ellipsis)))
+                              .map((u) => DropdownMenuItem(
+                                    value: u,
+                                    child: Text(u,
+                                        overflow: TextOverflow.ellipsis),
+                                  ))
                               .toList(),
-                          onChanged: (v) => setState(() => _selectedUnit = v ?? 'unidad'),
+                          onChanged: (v) =>
+                              setState(() => _selectedUnit = v ?? AppConstants.productUnits.first),
                         ),
                       ),
                     ],
@@ -260,13 +276,14 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   const SizedBox(height: 28),
 
                   // ── Sección: Precios ──
-                  _SectionHeader(
+                  const _SectionHeader(
                     icon: Icons.attach_money_rounded,
                     label: 'Precios',
                   ),
                   const SizedBox(height: 12),
 
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: TextFormField(
@@ -274,6 +291,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                           style: const TextStyle(color: AppColors.textPrimary),
                           keyboardType: TextInputType.number,
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          onChanged: (_) => setState(() {}),
                           decoration: const InputDecoration(
                             labelText: 'Precio de venta *',
                             prefixIcon: Icon(Icons.sell_outlined),
@@ -294,6 +312,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                           style: const TextStyle(color: AppColors.textPrimary),
                           keyboardType: TextInputType.number,
                           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                          onChanged: (_) => setState(() {}),
                           decoration: const InputDecoration(
                             labelText: 'Costo de compra *',
                             prefixIcon: Icon(Icons.shopping_cart_outlined),
@@ -321,13 +340,14 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   const SizedBox(height: 28),
 
                   // ── Sección: Inventario ──
-                  _SectionHeader(
+                  const _SectionHeader(
                     icon: Icons.inventory_2_outlined,
                     label: 'Inventario',
                   ),
                   const SizedBox(height: 12),
 
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: TextFormField(
@@ -372,7 +392,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   const SizedBox(height: 28),
 
                   // ── Sección: Información Adicional ──
-                  _SectionHeader(
+                  const _SectionHeader(
                     icon: Icons.more_horiz_rounded,
                     label: 'Información Adicional',
                   ),
@@ -381,6 +401,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   TextFormField(
                     controller: _supplierCtrl,
                     style: const TextStyle(color: AppColors.textPrimary),
+                    textCapitalization: TextCapitalization.words,
                     decoration: const InputDecoration(
                       labelText: 'Proveedor (opcional)',
                       prefixIcon: Icon(Icons.local_shipping_outlined),
@@ -391,6 +412,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   TextFormField(
                     controller: _imageUrlCtrl,
                     style: const TextStyle(color: AppColors.textPrimary),
+                    keyboardType: TextInputType.url,
                     decoration: const InputDecoration(
                       labelText: 'URL de imagen (opcional)',
                       prefixIcon: Icon(Icons.image_outlined),
@@ -415,12 +437,13 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                                 color: Colors.black,
                               ),
                             )
-                          : Icon(_isEditMode ? Icons.save_rounded : Icons.add_rounded),
-                      label: Text(_isEditMode ? 'Guardar Cambios' : 'Crear Producto'),
+                          : Icon(_isEditMode
+                              ? Icons.save_rounded
+                              : Icons.add_rounded),
+                      label: Text(
+                          _isEditMode ? 'Guardar Cambios' : '+ Crear Producto'),
                     ),
                   ),
-
-                  const SizedBox(height: 40),
                 ],
               ),
             ),
@@ -436,7 +459,8 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
 
     // Validación cruzada: costo vs precio
     if (costPrice > price) {
-      AppSnackbar.warning(context, 'El costo no puede ser mayor que el precio de venta.');
+      AppSnackbar.warning(
+          context, 'El costo no puede ser mayor que el precio de venta.');
       return;
     }
 

@@ -403,13 +403,13 @@ class _ProductCard extends StatelessWidget {
                   const SizedBox(height: 4),
 
                   // Categoría y código de barras
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
                     children: [
                       _MiniChip(label: product.category, icon: Icons.category_outlined),
-                      if (product.barcode != null && product.barcode!.isNotEmpty) ...[
-                        const SizedBox(width: 8),
+                      if (product.barcode != null && product.barcode!.isNotEmpty)
                         _MiniChip(label: product.barcode!, icon: Icons.qr_code_2_rounded),
-                      ],
                     ],
                   ),
                 ],
@@ -489,14 +489,16 @@ class _MiniChip extends StatelessWidget {
         children: [
           Icon(icon, size: 12, color: AppColors.textSecondary),
           const SizedBox(width: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 11,
+          Flexible(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 11,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

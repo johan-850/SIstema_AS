@@ -3,6 +3,7 @@
 // Implementación del repositorio — convierte excepciones a Failures
 // ============================================================
 
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../domain/entities/product.dart';
 import '../../domain/repositories/product_repository.dart';
@@ -141,4 +142,21 @@ class ProductRepositoryImpl implements ProductRepository {
       return (product: null, failure: _mapException(e));
     }
   }
+
+  @override
+  Future<({String? url, Failure? failure})> uploadProductImage(
+    Uint8List bytes,
+    String fileExt,
+  ) async {
+    try {
+      final url = await _datasource.uploadProductImage(bytes, fileExt);
+      return (url: url, failure: null);
+    } catch (e) {
+      return (url: null, failure: _mapException(e));
+    }
+  }
+
+  @override
+  Future<void> deleteProductImage(String imageUrl) =>
+      _datasource.deleteProductImage(imageUrl);
 }

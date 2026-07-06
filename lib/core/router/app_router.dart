@@ -10,6 +10,7 @@ import '../../features/cash_register/presentation/pages/cash_register_opening_pa
 import '../../features/pos/presentation/pages/pos_page.dart';
 import '../../features/products/presentation/pages/products_list_page.dart';
 import '../../features/products/presentation/pages/product_form_page.dart';
+import '../../features/products/presentation/pages/product_csv_import_page.dart';
 import '../../features/users/presentation/pages/users_list_page.dart';
 import '../../features/users/presentation/pages/create_cashier_page.dart';
 import '../../features/users/presentation/pages/cashier_detail_page.dart';
@@ -121,6 +122,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => ProductFormPage(
           productId: state.pathParameters['id'],
         ),
+      ),
+      // US-019: Import masivo de productos vía CSV
+      GoRoute(
+        path: '/admin/products/import',
+        name: 'product-import',
+        builder: (_, _) => const ProductCsvImportPage(),
       ),
     ],
 

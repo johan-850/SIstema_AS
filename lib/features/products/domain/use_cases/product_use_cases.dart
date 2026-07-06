@@ -7,6 +7,7 @@
 // US-016: Desactivar producto (soft delete)
 // ============================================================
 
+import 'dart:typed_data';
 import '../repositories/product_repository.dart';
 import '../../../../core/errors/failures.dart';
 
@@ -180,4 +181,23 @@ class ToggleProductStatusUseCase {
     required bool isActive,
   }) =>
       _repository.updateProduct(productId: productId, isActive: isActive);
+}
+
+// ── Foto de producto ──────────────────────────────────────────
+
+/// Sube una foto de producto (cámara o galería) y devuelve su URL pública.
+class UploadProductImageUseCase {
+  final ProductRepository _repository;
+  const UploadProductImageUseCase(this._repository);
+
+  Future<({String? url, Failure? failure})> call(Uint8List bytes, String fileExt) =>
+      _repository.uploadProductImage(bytes, fileExt);
+}
+
+/// Borra una foto de producto previamente subida (best-effort).
+class DeleteProductImageUseCase {
+  final ProductRepository _repository;
+  const DeleteProductImageUseCase(this._repository);
+
+  Future<void> call(String imageUrl) => _repository.deleteProductImage(imageUrl);
 }

@@ -3,7 +3,9 @@
 // Datasource remoto — Supabase queries para la tabla products
 // ============================================================
 
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 import '../../domain/entities/product.dart';
 import '../../../../core/constants/app_constants.dart';
 
@@ -189,5 +191,36 @@ class ProductRemoteDatasource {
         .single();
 
     return _fromJson(result);
+  }
+
+  // ── Foto de producto ────────────────────────────────────────
+
+  /// Sube una imagen al bucket de Storage y devuelve su URL pública.
+  Future<String> uploadProductImage(Uint8List bytes, String fileExt) async {
+    final path = 'products/${const Uuid().v4()}.$fileExt';
+    await _client.storage
+        .from(AppConstants.storageBucketProductImages)
+        .uploadBinary(path, bytes, fileOptions: const FileOptions(upsert: true));
+
+    return _client.storage
+        .from(AppConstants.storageBucketProductImages)
+        .getPublicUrl(path);
+  }
+
+  /// Borra una imagen del bucket a partir de su URL pública.
+  /// Best-effort: si falla (ej. URL externa que no vive en nuestro bucket),
+  /// no se propaga el error porque no es crítico para el flujo del usuario.
+  Future<void> deleteProductImage(String imageUrl) async {
+    try {
+      final marker = '/object/public/${AppConstants.storageBucketProductImages}/';
+      final idx = imageUrl.indexOf(marker);
+      if (idx == -1) return;
+      final path = imageUrl.substring(idx + marker.length);
+      await _client.storage
+          .from(AppConstants.storageBucketProductImages)
+          .remove([path]);
+    } catch (_) {
+      /* No crítico */
+    }
   }
 }

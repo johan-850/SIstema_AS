@@ -6,14 +6,19 @@
 // Diseño: Formulario sectionalizado dark Glassmorphism
 // ============================================================
 
+import 'dart:async';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/widgets/app_snackbar.dart';
+import '../../../../core/widgets/barcode_scanner_page.dart';
 import '../providers/product_providers.dart';
 import '../../domain/entities/product.dart';
 
@@ -41,7 +46,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   late final TextEditingController _costPriceCtrl;
   late final TextEditingController _stockCtrl;
   late final TextEditingController _minStockCtrl;
-  late final TextEditingController _imageUrlCtrl;
   late final TextEditingController _supplierCtrl;
 
   // Valores de los dropdowns — siempre inicializados a algo válido
@@ -51,6 +55,10 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
   bool _isEditMode = false;
   bool _isLoadingProduct = false;
   Product? _existingProduct;
+
+  // Foto de producto
+  String? _imageUrl;
+  bool _isUploadingImage = false;
 
   @override
   void initState() {
@@ -62,7 +70,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _costPriceCtrl = TextEditingController();
     _stockCtrl = TextEditingController(text: '0');
     _minStockCtrl = TextEditingController(text: '5');
-    _imageUrlCtrl = TextEditingController();
     _supplierCtrl = TextEditingController();
 
     _isEditMode = widget.productId != null;
@@ -87,7 +94,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
       _costPriceCtrl.text = p.costPrice.toStringAsFixed(0);
       _stockCtrl.text = p.stock.toString();
       _minStockCtrl.text = p.minStock.toString();
-      _imageUrlCtrl.text = p.imageUrl ?? '';
+      _imageUrl = p.imageUrl;
       _supplierCtrl.text = p.supplier ?? '';
       // Asegurar que el valor del dropdown exista en la lista
       _selectedCategory = AppConstants.productCategories.contains(p.category)
@@ -115,7 +122,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     _costPriceCtrl.dispose();
     _stockCtrl.dispose();
     _minStockCtrl.dispose();
-    _imageUrlCtrl.dispose();
     _supplierCtrl.dispose();
     super.dispose();
   }
@@ -169,6 +175,10 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
                 children: [
+                  // ── Foto de producto ──
+                  Center(child: _buildPhotoPicker()),
+                  const SizedBox(height: 28),
+
                   // ── Sección: Información Básica ──
                   const _SectionHeader(
                     icon: Icons.info_outline_rounded,
@@ -191,14 +201,19 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Código de barras
+                  // Código de barras (US-013/US-018: escaneo con cámara)
                   TextFormField(
                     controller: _barcodeCtrl,
                     style: const TextStyle(color: AppColors.textPrimary),
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Código de barras (opcional)',
-                      prefixIcon: Icon(Icons.qr_code_2_rounded),
+                      prefixIcon: const Icon(Icons.qr_code_2_rounded),
+                      suffixIcon: IconButton(
+                        tooltip: 'Escanear con la cámara',
+                        icon: const Icon(Icons.qr_code_scanner_rounded),
+                        onPressed: _scanBarcode,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -407,18 +422,6 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
                       prefixIcon: Icon(Icons.local_shipping_outlined),
                     ),
                   ),
-                  const SizedBox(height: 12),
-
-                  TextFormField(
-                    controller: _imageUrlCtrl,
-                    style: const TextStyle(color: AppColors.textPrimary),
-                    keyboardType: TextInputType.url,
-                    decoration: const InputDecoration(
-                      labelText: 'URL de imagen (opcional)',
-                      prefixIcon: Icon(Icons.image_outlined),
-                      hintText: 'https://...',
-                    ),
-                  ),
 
                   const SizedBox(height: 32),
 
@@ -450,6 +453,171 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     );
   }
 
+  /// US-013/US-018: Escanea un código de barras con la cámara y avisa
+  /// de inmediato si ya pertenece a otro producto (la validación
+  /// definitiva contra duplicados ocurre igual en CreateProductUseCase).
+  Future<void> _scanBarcode() async {
+    final code = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const BarcodeScannerPage()),
+    );
+    if (code == null || !mounted) return;
+
+    setState(() => _barcodeCtrl.text = code);
+
+    final result =
+        await ref.read(getProductByBarcodeUseCaseProvider)(code);
+    if (!mounted) return;
+    final found = result.product;
+    if (found != null && found.id != _existingProduct?.id) {
+      AppSnackbar.warning(
+        context,
+        'Este código ya pertenece a "${found.name}".',
+      );
+    }
+  }
+
+  // ── Foto de producto ──────────────────────────────────────────
+
+  bool get _hasImage => _imageUrl != null && _imageUrl!.isNotEmpty;
+
+  Widget _buildPhotoPicker() {
+    return GestureDetector(
+      onTap: _isUploadingImage ? null : _showImageSourceSheet,
+      child: Container(
+        width: 96,
+        height: 96,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (_hasImage)
+              CachedNetworkImage(
+                imageUrl: _imageUrl!,
+                fit: BoxFit.cover,
+                errorWidget: (_, _, _) => const Icon(
+                  Icons.broken_image_outlined,
+                  color: AppColors.textDisabled,
+                  size: 32,
+                ),
+              )
+            else
+              const Icon(
+                Icons.add_a_photo_outlined,
+                color: AppColors.textSecondary,
+                size: 32,
+              ),
+            if (_isUploadingImage)
+              Container(
+                color: Colors.black.withValues(alpha: 0.5),
+                child: const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.primary,
+                    strokeWidth: 2,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showImageSourceSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded, color: AppColors.primary),
+              title: const Text('Tomar foto', style: TextStyle(color: AppColors.textPrimary)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAndUploadImage(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
+              title: const Text('Elegir de galería', style: TextStyle(color: AppColors.textPrimary)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAndUploadImage(ImageSource.gallery);
+              },
+            ),
+            if (_hasImage)
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+                title: const Text('Eliminar foto', style: TextStyle(color: AppColors.error)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _removeImage();
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndUploadImage(ImageSource source) async {
+    final XFile? picked;
+    try {
+      picked = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 1024,
+        imageQuality: 80,
+      );
+    } catch (_) {
+      if (mounted) AppSnackbar.error(context, 'No se pudo acceder a la cámara/galería.');
+      return;
+    }
+    if (picked == null || !mounted) return;
+
+    setState(() => _isUploadingImage = true);
+
+    final bytes = await picked.readAsBytes();
+    final ext = picked.name.contains('.') ? picked.name.split('.').last : 'jpg';
+    final result = await ref.read(uploadProductImageUseCaseProvider)(bytes, ext);
+
+    if (!mounted) return;
+
+    if (result.failure != null) {
+      setState(() => _isUploadingImage = false);
+      AppSnackbar.error(context, result.failure!.message);
+      return;
+    }
+
+    final oldUrl = _hasImage ? _imageUrl : null;
+    setState(() {
+      _imageUrl = result.url;
+      _isUploadingImage = false;
+    });
+
+    // Best-effort: borrar la foto anterior si se reemplazó
+    if (oldUrl != null) {
+      unawaited(ref.read(deleteProductImageUseCaseProvider)(oldUrl));
+    }
+  }
+
+  Future<void> _removeImage() async {
+    final oldUrl = _imageUrl;
+    setState(() => _imageUrl = null);
+    if (oldUrl != null && oldUrl.isNotEmpty) {
+      unawaited(ref.read(deleteProductImageUseCaseProvider)(oldUrl));
+    }
+  }
+
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
 
@@ -476,7 +644,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         stock: int.tryParse(_stockCtrl.text) ?? 0,
         minStock: int.tryParse(_minStockCtrl.text) ?? 5,
         unit: _selectedUnit,
-        imageUrl: _imageUrlCtrl.text.isEmpty ? null : _imageUrlCtrl.text,
+        imageUrl: _imageUrl ?? '',
         supplier: _supplierCtrl.text.isEmpty ? null : _supplierCtrl.text,
       );
     } else {
@@ -490,7 +658,7 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
         stock: int.tryParse(_stockCtrl.text) ?? 0,
         minStock: int.tryParse(_minStockCtrl.text) ?? 5,
         unit: _selectedUnit,
-        imageUrl: _imageUrlCtrl.text.isEmpty ? null : _imageUrlCtrl.text,
+        imageUrl: _imageUrl,
         supplier: _supplierCtrl.text.isEmpty ? null : _supplierCtrl.text,
       );
     }

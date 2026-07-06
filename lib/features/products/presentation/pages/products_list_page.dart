@@ -5,6 +5,7 @@
 // Diseño: Glassmorphism / Neumorphism dark
 // ============================================================
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -53,6 +54,12 @@ class _ProductsListPageState extends ConsumerState<ProductsListPage> {
           onPressed: () => context.go('/admin'),
         ),
         actions: [
+          // US-019: Importar productos desde CSV
+          IconButton(
+            tooltip: 'Importar CSV',
+            icon: const Icon(Icons.upload_file_rounded),
+            onPressed: () => context.push('/admin/products/import'),
+          ),
           // Botón de filtro de categoría
           IconButton(
             icon: Badge(
@@ -357,6 +364,10 @@ class _ProductCard extends StatelessWidget {
             ),
             const SizedBox(width: 12),
 
+            // ── Miniatura de foto ──
+            _ProductThumbnail(imageUrl: product.imageUrl),
+            const SizedBox(width: 12),
+
             // ── Info principal ──
             Expanded(
               child: Column(
@@ -465,6 +476,47 @@ class _ProductCard extends StatelessWidget {
     if (product.isOutOfStock) return AppColors.stockCritical;
     if (product.isLowStock) return AppColors.stockWarning;
     return AppColors.stockOk;
+  }
+}
+
+// ── Miniatura de foto de producto ─────────────────────────────
+
+class _ProductThumbnail extends StatelessWidget {
+  final String? imageUrl;
+  const _ProductThumbnail({required this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage = imageUrl != null && imageUrl!.isNotEmpty;
+    return Container(
+      width: 44,
+      height: 44,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: hasImage
+          ? CachedNetworkImage(
+              imageUrl: imageUrl!,
+              fit: BoxFit.cover,
+              placeholder: (_, _) => const Icon(
+                Icons.inventory_2_outlined,
+                size: 18,
+                color: AppColors.textDisabled,
+              ),
+              errorWidget: (_, _, _) => const Icon(
+                Icons.inventory_2_outlined,
+                size: 18,
+                color: AppColors.textDisabled,
+              ),
+            )
+          : const Icon(
+              Icons.inventory_2_outlined,
+              size: 18,
+              color: AppColors.textDisabled,
+            ),
+    );
   }
 }
 

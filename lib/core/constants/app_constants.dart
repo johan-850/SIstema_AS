@@ -19,6 +19,9 @@ abstract class AppConstants {
   static const String tableProducts          = 'products';
   static const String tableStockMovements    = 'stock_movements';
 
+  // ── Storage buckets — EP-03 ───────────────────────────────
+  static const String storageBucketProductImages = 'product-images';
+
   // ── Edge Functions ────────────────────────────────────────
   static const String fnCreateCashier        = 'create-cashier';
   static const String fnToggleCashierStatus  = 'toggle-cashier-status';
@@ -29,6 +32,21 @@ abstract class AppConstants {
   static const int maxNotesLength    = 300;
   static const int maxProductNameLength  = 120;
   static const int maxDescriptionLength  = 500;
+
+  // ── Import CSV de productos — US-019 ──────────────────────
+  static const int maxCsvImportRows = 500;
+  static const List<String> csvImportHeaders = [
+    'barcode',
+    'name',
+    'description',
+    'category',
+    'price',
+    'cost_price',
+    'stock',
+    'min_stock',
+    'unit',
+    'supplier',
+  ];
 
   // ── Timeouts ──────────────────────────────────────────────
   static const Duration requestTimeout = Duration(seconds: 15);

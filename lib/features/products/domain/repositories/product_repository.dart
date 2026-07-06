@@ -3,6 +3,7 @@
 // Contrato del repositorio de productos — Clean Architecture
 // ============================================================
 
+import 'dart:typed_data';
 import '../entities/product.dart';
 import '../../../../core/errors/failures.dart';
 
@@ -68,4 +69,13 @@ abstract class ProductRepository {
     String? imageUrl,
     String? supplier,
   });
+
+  /// Sube una foto de producto y devuelve su URL pública.
+  Future<({String? url, Failure? failure})> uploadProductImage(
+    Uint8List bytes,
+    String fileExt,
+  );
+
+  /// Borra una foto de producto previamente subida (best-effort).
+  Future<void> deleteProductImage(String imageUrl);
 }

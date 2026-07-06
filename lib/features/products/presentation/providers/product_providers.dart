@@ -56,6 +56,11 @@ final deleteProductImageUseCaseProvider = Provider(
   (ref) => DeleteProductImageUseCase(ref.read(productRepositoryProvider)),
 );
 
+// ── US-017: Filtro por alerta de stock ─────────────────────────
+
+/// Nivel de alerta de stock para filtrar el listado (US-017).
+enum StockAlertFilter { all, low, outOfStock }
+
 // ── US-014: Estado del listado de productos ───────────────────
 
 /// Estado que maneja la lista de productos, búsqueda y paginación.
@@ -69,6 +74,7 @@ class ProductListState {
   final String? searchQuery;
   final String? filterCategory;
   final bool showInactive;
+  final StockAlertFilter filterStockAlert;
 
   const ProductListState({
     this.products = const [],
@@ -78,13 +84,15 @@ class ProductListState {
     this.searchQuery,
     this.filterCategory,
     this.showInactive = false,
+    this.filterStockAlert = StockAlertFilter.all,
   });
 
   /// True cuando hay filtros o búsqueda activa
   bool get hasActiveFilters =>
       (searchQuery != null && searchQuery!.isNotEmpty) ||
       filterCategory != null ||
-      showInactive;
+      showInactive ||
+      filterStockAlert != StockAlertFilter.all;
 
   ProductListState copyWith({
     List<Product>? products,
@@ -94,6 +102,7 @@ class ProductListState {
     String? searchQuery,
     String? filterCategory,
     bool? showInactive,
+    StockAlertFilter? filterStockAlert,
     bool clearFailure = false,
     bool clearFilters = false,
   }) =>
@@ -108,6 +117,9 @@ class ProductListState {
             clearFilters ? null : (filterCategory ?? this.filterCategory),
         showInactive:
             clearFilters ? false : (showInactive ?? this.showInactive),
+        filterStockAlert: clearFilters
+            ? StockAlertFilter.all
+            : (filterStockAlert ?? this.filterStockAlert),
       );
 }
 
@@ -119,6 +131,11 @@ class ProductListNotifier extends StateNotifier<ProductListState> {
   }
 
   /// Carga (o recarga) la lista con los filtros actuales.
+  ///
+  /// El filtro de alerta de stock se aplica client-side sobre lo ya
+  /// traído: Supabase/PostgREST no compara columnas entre sí
+  /// (stock vs min_stock) en una query simple. A la escala de una
+  /// tienda pequeña esto es aceptable.
   Future<void> load({int page = 0}) async {
     state = state.copyWith(isLoading: true, currentPage: page, clearFailure: true);
 
@@ -132,7 +149,12 @@ class ProductListNotifier extends StateNotifier<ProductListState> {
     if (result.failure != null) {
       state = state.copyWith(isLoading: false, failure: result.failure);
     } else {
-      state = state.copyWith(isLoading: false, products: result.products);
+      final filtered = switch (state.filterStockAlert) {
+        StockAlertFilter.all => result.products,
+        StockAlertFilter.low => result.products.where((p) => p.isLowStock && !p.isOutOfStock).toList(),
+        StockAlertFilter.outOfStock => result.products.where((p) => p.isOutOfStock).toList(),
+      };
+      state = state.copyWith(isLoading: false, products: filtered);
     }
   }
 
@@ -151,6 +173,12 @@ class ProductListNotifier extends StateNotifier<ProductListState> {
   /// Mostrar/ocultar productos inactivos
   Future<void> toggleShowInactive() async {
     state = state.copyWith(showInactive: !state.showInactive);
+    await load();
+  }
+
+  /// US-017: Filtrar por alerta de stock (todos / bajo mínimo / agotado)
+  Future<void> filterByStockAlert(StockAlertFilter filter) async {
+    state = state.copyWith(filterStockAlert: filter);
     await load();
   }
 

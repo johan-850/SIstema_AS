@@ -11,6 +11,10 @@ import '../../features/pos/presentation/pages/pos_page.dart';
 import '../../features/products/presentation/pages/products_list_page.dart';
 import '../../features/products/presentation/pages/product_form_page.dart';
 import '../../features/products/presentation/pages/product_csv_import_page.dart';
+import '../../features/products/presentation/pages/product_catalog_readonly_page.dart';
+import '../../features/inventory/presentation/pages/inventory_dashboard_page.dart';
+import '../../features/inventory/presentation/pages/stock_movement_history_page.dart';
+import '../../features/inventory/presentation/pages/restock_list_page.dart';
 import '../../features/users/presentation/pages/users_list_page.dart';
 import '../../features/users/presentation/pages/create_cashier_page.dart';
 import '../../features/users/presentation/pages/cashier_detail_page.dart';
@@ -23,8 +27,10 @@ abstract class AppRoutes {
   static const cashRegisterOpening  = '/cash-register/opening';
   static const cashRegistersHistory = '/admin/cash-registers';   // US-011
   static const pos                  = '/pos';
+  static const catalog              = '/catalog';               // US-018
   static const products             = '/admin/products';
-  static const inventory            = '/admin/inventory';
+  static const inventory            = '/admin/inventory';       // US-020
+  static const inventoryRestock     = '/admin/inventory/restock'; // US-024
   static const users                = '/admin/users';
   static const createCashier        = '/admin/users/create';
   static const cashierDetail        = '/admin/users/:id';
@@ -128,6 +134,30 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/admin/products/import',
         name: 'product-import',
         builder: (_, _) => const ProductCsvImportPage(),
+      ),
+      // US-018: Catálogo de solo lectura para Cajero
+      GoRoute(
+        path: AppRoutes.catalog,
+        name: 'catalog',
+        builder: (_, _) => const ProductCatalogReadonlyPage(),
+      ),
+      // EP-04: Inventario y Stock
+      GoRoute(
+        path: AppRoutes.inventory,
+        name: 'inventory',
+        builder: (_, _) => const InventoryDashboardPage(),
+      ),
+      GoRoute(
+        path: '/admin/inventory/:productId/movements',
+        name: 'inventory-movements',
+        builder: (_, state) => StockMovementHistoryPage(
+          productId: state.pathParameters['productId']!,
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.inventoryRestock,
+        name: 'inventory-restock',
+        builder: (_, _) => const RestockListPage(),
       ),
     ],
 

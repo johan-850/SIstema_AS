@@ -43,18 +43,16 @@ class UserRemoteDatasource {
       'metadata': {'timestamp': DateTime.now().toUtc().toIso8601String()},
     });
 
-    // TODO: Descomentar cuando se despliegue la Edge Function 'toggle-cashier-status'
-    // en Supabase Dashboard → Edge Functions. Por ahora, is_active=false en
-    // la BD es suficiente para impedir el login en el próximo intento.
-    //
-    // if (!isActive) {
-    //   try {
-    //     await _client.functions.invoke(
-    //       AppConstants.fnToggleCashierStatus,
-    //       body: {'userId': cashierId, 'isActive': isActive},
-    //     );
-    //   } catch (_) { /* No crítico */ }
-    // }
+    // Invalida la sesión activa del cajero vía Edge Function (best-effort:
+    // is_active=false en la BD ya basta para bloquear el próximo login).
+    if (!isActive) {
+      try {
+        await _client.functions.invoke(
+          AppConstants.fnToggleCashierStatus,
+          body: {'userId': cashierId, 'isActive': isActive},
+        );
+      } catch (_) { /* No crítico */ }
+    }
   }
 
   /// US-006: Dispara correo de reset via Supabase Auth

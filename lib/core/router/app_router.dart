@@ -1,8 +1,3 @@
-// ============================================================
-// lib/core/router/app_router.dart
-// GoRouter con guards de autenticación por rol
-// ============================================================
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,46 +5,56 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/providers/auth_providers.dart';
 import '../../features/dashboard/presentation/pages/admin_dashboard_page.dart';
+import '../../features/dashboard/presentation/pages/admin_cash_registers_page.dart';
 import '../../features/cash_register/presentation/pages/cash_register_opening_page.dart';
 import '../../features/pos/presentation/pages/pos_page.dart';
+import '../../features/products/presentation/pages/products_list_page.dart';
+import '../../features/products/presentation/pages/product_form_page.dart';
+import '../../features/products/presentation/pages/product_csv_import_page.dart';
+import '../../features/users/presentation/pages/users_list_page.dart';
+import '../../features/users/presentation/pages/create_cashier_page.dart';
+import '../../features/users/presentation/pages/cashier_detail_page.dart';
+import '../../features/settings/presentation/pages/settings_page.dart';
 
 // ── Rutas nombradas ─────────────────────────────────────────
 abstract class AppRoutes {
-  static const login = '/login';
-  static const adminDashboard = '/admin';
-  static const cashRegisterOpening = '/cash-register/opening';
-  static const pos = '/pos';
-  static const products = '/admin/products';
-  static const inventory = '/admin/inventory';
-  static const expenses = '/expenses';
-  static const closing = '/cash-register/closing';
-  static const reports = '/admin/reports';
-  static const analytics = '/admin/analytics';
-  static const users = '/admin/users';
-  static const settings = '/settings';
-  static const bluetooth = '/settings/bluetooth';
-  static const notifications = '/notifications';
+  static const login                = '/login';
+  static const adminDashboard       = '/admin';
+  static const cashRegisterOpening  = '/cash-register/opening';
+  static const cashRegistersHistory = '/admin/cash-registers';   // US-011
+  static const pos                  = '/pos';
+  static const products             = '/admin/products';
+  static const inventory            = '/admin/inventory';
+  static const users                = '/admin/users';
+  static const createCashier        = '/admin/users/create';
+  static const cashierDetail        = '/admin/users/:id';
+  static const settings             = '/settings';
+  static const reports              = '/admin/reports';
+  static const analytics            = '/admin/analytics';
 }
+
 
 // ── Provider del router ─────────────────────────────────────
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
+  final authStream = ref.watch(authStateStreamProvider);
 
   return GoRouter(
     initialLocation: AppRoutes.login,
-    refreshListenable: GoRouterRefreshStream(
-      ref.watch(authStateChangesProvider.stream),
-    ),
     redirect: (context, state) {
-      final isLoggedIn = authState.valueOrNull != null;
+      // Si el stream aún está cargando, no redirigir todavía
+      if (authStream.isLoading) return null;
+
+      final user = authStream.valueOrNull;
+      final isLoggedIn = user != null;
       final isLoginPage = state.matchedLocation == AppRoutes.login;
 
       if (!isLoggedIn && !isLoginPage) return AppRoutes.login;
       if (isLoggedIn && isLoginPage) {
-        // Redirigir según rol
-        final role = ref.read(currentUserRoleProvider);
-        if (role == 'adminmaster') return AppRoutes.adminDashboard;
-        return AppRoutes.cashRegisterOpening;
+        // Leer el rol directamente del usuario ya cargado (evita race condition)
+        final role = user.role;
+        return role == 'adminmaster'
+            ? AppRoutes.adminDashboard
+            : AppRoutes.cashRegisterOpening;
       }
       return null;
     },
@@ -57,44 +62,78 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.login,
         name: 'login',
-        builder: (context, state) => const LoginPage(),
+        builder: (_, _) => const LoginPage(),
       ),
       GoRoute(
         path: AppRoutes.adminDashboard,
         name: 'admin-dashboard',
-        builder: (context, state) => const AdminDashboardPage(),
+        builder: (_, _) => const AdminDashboardPage(),
       ),
       GoRoute(
         path: AppRoutes.cashRegisterOpening,
         name: 'cash-register-opening',
-        builder: (context, state) => const CashRegisterOpeningPage(),
+        builder: (_, _) => const CashRegisterOpeningPage(),
+      ),
+      // US-011: Historial de aperturas (solo AdminMaster)
+      GoRoute(
+        path: AppRoutes.cashRegistersHistory,
+        name: 'cash-registers-history',
+        builder: (_, _) => const AdminCashRegistersPage(),
       ),
       GoRoute(
         path: AppRoutes.pos,
         name: 'pos',
-        builder: (context, state) => const PosPage(),
+        builder: (_, _) => const PosPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.users,
+        name: 'users',
+        builder: (_, _) => const UsersListPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.createCashier,
+        name: 'create-cashier',
+        builder: (_, _) => const CreateCashierPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.cashierDetail,
+        name: 'cashier-detail',
+        builder: (_, state) => CashierDetailPage(cashierId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: AppRoutes.settings,
+        name: 'settings',
+        builder: (_, _) => const SettingsPage(),
+      ),
+      // EP-03: CRUD de Productos
+      GoRoute(
+        path: AppRoutes.products,
+        name: 'products',
+        builder: (_, _) => const ProductsListPage(),
+      ),
+      GoRoute(
+        path: '/admin/products/new',
+        name: 'product-new',
+        builder: (_, _) => const ProductFormPage(),
+      ),
+      GoRoute(
+        path: '/admin/products/edit/:id',
+        name: 'product-edit',
+        builder: (_, state) => ProductFormPage(
+          productId: state.pathParameters['id'],
+        ),
+      ),
+      // US-019: Import masivo de productos vía CSV
+      GoRoute(
+        path: '/admin/products/import',
+        name: 'product-import',
+        builder: (_, _) => const ProductCsvImportPage(),
       ),
     ],
-    errorBuilder: (context, state) => Scaffold(
-      body: Center(
-        child: Text('Página no encontrada: ${state.error}'),
-      ),
+
+
+    errorBuilder: (_, state) => Scaffold(
+      body: Center(child: Text('Ruta no encontrada: ${state.error}')),
     ),
   );
 });
-
-// ── Helper: convierte Stream en Listenable ──────────────────
-class GoRouterRefreshStream extends ChangeNotifier {
-  GoRouterRefreshStream(Stream<dynamic> stream) {
-    notifyListeners();
-    _subscription = stream.listen((_) => notifyListeners());
-  }
-
-  late final dynamic _subscription;
-
-  @override
-  void dispose() {
-    _subscription.cancel();
-    super.dispose();
-  }
-}

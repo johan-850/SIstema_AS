@@ -4,7 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
 // ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'package:share_plus/share_plus.dart';
+import 'dart:typed_data';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/confirmation_dialog.dart';
@@ -76,7 +77,7 @@ class _UsersListPageState extends ConsumerState<UsersListPage> {
                         child: ListView.separated(
                           padding: const EdgeInsets.all(16),
                           itemCount: listState.cashiers.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          separatorBuilder: (_, _) => const SizedBox(height: 10),
                           itemBuilder: (context, i) => _CashierCard(
                             cashier: listState.cashiers[i],
                             onToggle: (isActive) => _confirmToggle(context, listState.cashiers[i], isActive),
@@ -120,15 +121,17 @@ class _UsersListPageState extends ConsumerState<UsersListPage> {
       if (context.mounted) AppSnackbar.error(context, result.failure!.message);
       return;
     }
-    // Descarga directa en el navegador (compatible con web)
+    // Descarga/Compartir (compatible con móvil, web y escritorio)
     final bytes = utf8.encode(result.csv!);
-    final blob = html.Blob([bytes], 'text/csv;charset=utf-8');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    html.AnchorElement(href: url)
-      ..setAttribute('download', 'cajeros_${DateTime.now().millisecondsSinceEpoch}.csv')
-      ..click();
-    html.Url.revokeObjectUrl(url);
-    if (context.mounted) AppSnackbar.success(context, 'CSV descargado correctamente');
+    final fileName = 'cajeros_${DateTime.now().millisecondsSinceEpoch}.csv';
+    final xFile = XFile.fromData(
+      Uint8List.fromList(bytes),
+      name: fileName,
+      mimeType: 'text/csv',
+    );
+    await Share.shareXFiles([xFile], text: 'Exportación de Cajeros');
+    
+    if (context.mounted) AppSnackbar.success(context, 'CSV exportado correctamente');
   }
 }
 

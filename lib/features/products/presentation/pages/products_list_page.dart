@@ -5,7 +5,6 @@
 // Diseño: Glassmorphism / Neumorphism dark
 // ============================================================
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,8 +12,8 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/widgets/app_snackbar.dart';
+import '../../../../core/widgets/product_list_card.dart';
 import '../providers/product_providers.dart';
-import '../../domain/entities/product.dart';
 
 class ProductsListPage extends ConsumerStatefulWidget {
   const ProductsListPage({super.key});
@@ -25,7 +24,11 @@ class ProductsListPage extends ConsumerStatefulWidget {
 
 class _ProductsListPageState extends ConsumerState<ProductsListPage> {
   final _searchController = TextEditingController();
-  final _currencyFmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+  final _currencyFmt = NumberFormat.currency(
+    locale: 'es_CO',
+    symbol: '\$',
+    decimalDigits: 0,
+  );
 
   @override
   void dispose() {
@@ -60,14 +63,16 @@ class _ProductsListPageState extends ConsumerState<ProductsListPage> {
             icon: const Icon(Icons.upload_file_rounded),
             onPressed: () => context.push('/admin/products/import'),
           ),
-          // Botón de filtro de categoría
+          // Botón de filtros (categoría + alerta de stock — US-017)
           IconButton(
             icon: Badge(
-              isLabelVisible: state.filterCategory != null,
+              isLabelVisible:
+                  state.filterCategory != null ||
+                  state.filterStockAlert != StockAlertFilter.all,
               backgroundColor: AppColors.primary,
               child: const Icon(Icons.filter_list_rounded),
             ),
-            onPressed: () => _showCategoryFilter(context, notifier, state),
+            onPressed: () => _showFilterSheet(context, notifier, state),
           ),
           // Toggle productos inactivos
           IconButton(
@@ -77,7 +82,9 @@ class _ProductsListPageState extends ConsumerState<ProductsListPage> {
                   : Icons.visibility_rounded,
               color: state.showInactive ? AppColors.warning : null,
             ),
-            tooltip: state.showInactive ? 'Ocultar inactivos' : 'Mostrar inactivos',
+            tooltip: state.showInactive
+                ? 'Ocultar inactivos'
+                : 'Mostrar inactivos',
             onPressed: () => notifier.toggleShowInactive(),
           ),
         ],
@@ -104,6 +111,7 @@ class _ProductsListPageState extends ConsumerState<ProductsListPage> {
               child: _ActiveFiltersChip(
                 category: state.filterCategory,
                 showInactive: state.showInactive,
+                stockAlert: state.filterStockAlert,
                 onClear: () {
                   _searchController.clear();
                   notifier.clearFilters();
@@ -114,29 +122,34 @@ class _ProductsListPageState extends ConsumerState<ProductsListPage> {
           // ── Lista de productos ──────────────────────────────
           Expanded(
             child: state.isLoading
-                ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.primary),
+                  )
                 : state.products.isEmpty
-                    ? _EmptyState(
-                        hasFilters: state.hasActiveFilters,
-                        onClearFilters: () {
-                          _searchController.clear();
-                          notifier.clearFilters();
-                        },
-                      )
-                    : RefreshIndicator(
-                        color: AppColors.primary,
-                        onRefresh: () => notifier.refresh(),
-                        child: ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                          itemCount: state.products.length,
-                          separatorBuilder: (_, _) => const SizedBox(height: 10),
-                          itemBuilder: (context, i) => _ProductCard(
-                            product: state.products[i],
-                            currencyFmt: _currencyFmt,
-                            onTap: () => context.go('/admin/products/edit/${state.products[i].id}'),
-                          ),
+                ? _EmptyState(
+                    hasFilters: state.hasActiveFilters,
+                    onClearFilters: () {
+                      _searchController.clear();
+                      notifier.clearFilters();
+                    },
+                  )
+                : RefreshIndicator(
+                    color: AppColors.primary,
+                    onRefresh: () => notifier.refresh(),
+                    child: ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                      itemCount: state.products.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, i) => ProductListCard(
+                        product: state.products[i],
+                        currencyFmt: _currencyFmt,
+                        showInactiveBadge: true,
+                        onTap: () => context.go(
+                          '/admin/products/edit/${state.products[i].id}',
                         ),
                       ),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -152,8 +165,8 @@ class _ProductsListPageState extends ConsumerState<ProductsListPage> {
     );
   }
 
-  /// Bottom sheet para seleccionar categoría
-  void _showCategoryFilter(
+  /// Bottom sheet para filtrar por alerta de stock (US-017) y categoría
+  void _showFilterSheet(
     BuildContext context,
     ProductListNotifier notifier,
     ProductListState state,
@@ -164,40 +177,98 @@ class _ProductsListPageState extends ConsumerState<ProductsListPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Row(
-                children: [
-                  const Icon(Icons.category_rounded, color: AppColors.primary, size: 20),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Filtrar por Categoría',
-                    style: TextStyle(
-                      color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
+      builder: (_) => SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── US-017: Alerta de stock ──
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: AppColors.primary,
+                      size: 20,
                     ),
-                  ),
-                  const Spacer(),
-                  if (state.filterCategory != null)
-                    TextButton(
-                      onPressed: () {
-                        notifier.filterByCategory(null);
-                        Navigator.pop(context);
-                      },
-                      child: const Text('Limpiar'),
+                    SizedBox(width: 8),
+                    Text(
+                      'Alerta de Stock',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
                     ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const Divider(height: 1),
-            ...AppConstants.productCategories.map((cat) => ListTile(
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    _StockAlertChip(
+                      label: 'Todos',
+                      selected: state.filterStockAlert == StockAlertFilter.all,
+                      onTap: () =>
+                          notifier.filterByStockAlert(StockAlertFilter.all),
+                    ),
+                    _StockAlertChip(
+                      label: 'Bajo mínimo',
+                      color: AppColors.stockWarning,
+                      selected: state.filterStockAlert == StockAlertFilter.low,
+                      onTap: () =>
+                          notifier.filterByStockAlert(StockAlertFilter.low),
+                    ),
+                    _StockAlertChip(
+                      label: 'Agotado',
+                      color: AppColors.stockCritical,
+                      selected:
+                          state.filterStockAlert == StockAlertFilter.outOfStock,
+                      onTap: () => notifier.filterByStockAlert(
+                        StockAlertFilter.outOfStock,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // ── Categoría ──
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.category_rounded,
+                      color: AppColors.primary,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Filtrar por Categoría',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (state.filterCategory != null)
+                      TextButton(
+                        onPressed: () => notifier.filterByCategory(null),
+                        child: const Text('Limpiar'),
+                      ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              ...AppConstants.productCategories.map(
+                (cat) => ListTile(
                   leading: Icon(
                     state.filterCategory == cat
                         ? Icons.radio_button_checked_rounded
@@ -207,14 +278,19 @@ class _ProductsListPageState extends ConsumerState<ProductsListPage> {
                         : AppColors.textSecondary,
                     size: 20,
                   ),
-                  title: Text(cat, style: const TextStyle(color: AppColors.textPrimary)),
+                  title: Text(
+                    cat,
+                    style: const TextStyle(color: AppColors.textPrimary),
+                  ),
                   dense: true,
                   onTap: () {
                     notifier.filterByCategory(cat);
                     Navigator.pop(context);
                   },
-                )),
-          ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -249,10 +325,17 @@ class _SearchBar extends StatelessWidget {
         decoration: InputDecoration(
           hintText: 'Buscar por nombre o código de barras...',
           hintStyle: const TextStyle(color: AppColors.textDisabled),
-          prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textSecondary),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: AppColors.textSecondary,
+          ),
           suffixIcon: controller.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary, size: 20),
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: AppColors.textSecondary,
+                    size: 20,
+                  ),
                   onPressed: onClear,
                 )
               : null,
@@ -271,17 +354,21 @@ class _SearchBar extends StatelessWidget {
 class _ActiveFiltersChip extends StatelessWidget {
   final String? category;
   final bool showInactive;
+  final StockAlertFilter stockAlert;
   final VoidCallback onClear;
 
   const _ActiveFiltersChip({
     this.category,
     this.showInactive = false,
+    this.stockAlert = StockAlertFilter.all,
     required this.onClear,
   });
 
   @override
   Widget build(BuildContext context) {
     final labels = <String>[];
+    if (stockAlert == StockAlertFilter.low) labels.add('Bajo mínimo');
+    if (stockAlert == StockAlertFilter.outOfStock) labels.add('Agotado');
     if (category != null) labels.add(category!);
     if (showInactive) labels.add('Inactivos visibles');
 
@@ -296,7 +383,11 @@ class _ActiveFiltersChip extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.filter_alt_rounded, size: 16, color: AppColors.primary),
+          const Icon(
+            Icons.filter_alt_rounded,
+            size: 16,
+            color: AppColors.primary,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -310,7 +401,11 @@ class _ActiveFiltersChip extends StatelessWidget {
           ),
           GestureDetector(
             onTap: onClear,
-            child: const Icon(Icons.close_rounded, size: 16, color: AppColors.primary),
+            child: const Icon(
+              Icons.close_rounded,
+              size: 16,
+              color: AppColors.primary,
+            ),
           ),
         ],
       ),
@@ -318,16 +413,18 @@ class _ActiveFiltersChip extends StatelessWidget {
   }
 }
 
-// ── Product Card ──────────────────────────────────────────────
+// ── Chip de filtro de alerta de stock (US-017) ────────────────
 
-class _ProductCard extends StatelessWidget {
-  final Product product;
-  final NumberFormat currencyFmt;
+class _StockAlertChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  final bool selected;
   final VoidCallback onTap;
 
-  const _ProductCard({
-    required this.product,
-    required this.currencyFmt,
+  const _StockAlertChip({
+    required this.label,
+    this.color = AppColors.primary,
+    required this.selected,
     required this.onTap,
   });
 
@@ -335,224 +432,23 @@ class _ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: product.isActive
-              ? AppColors.surfaceCard
-              : AppColors.surfaceCard.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: product.isOutOfStock
-                ? AppColors.stockCritical.withValues(alpha: 0.4)
-                : product.isLowStock
-                    ? AppColors.stockWarning.withValues(alpha: 0.3)
-                    : AppColors.border,
+          color: selected
+              ? color.withValues(alpha: 0.15)
+              : AppColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? color : AppColors.border),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? color : AppColors.textSecondary,
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
-        child: Row(
-          children: [
-            // ── Indicador de stock (barra lateral) ──
-            Container(
-              width: 4,
-              height: 52,
-              decoration: BoxDecoration(
-                color: _stockColor,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // ── Miniatura de foto ──
-            _ProductThumbnail(imageUrl: product.imageUrl),
-            const SizedBox(width: 12),
-
-            // ── Info principal ──
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Nombre + badge de inactivo
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          product.name,
-                          style: TextStyle(
-                            color: product.isActive
-                                ? AppColors.textPrimary
-                                : AppColors.textDisabled,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                            decoration: product.isActive
-                                ? null
-                                : TextDecoration.lineThrough,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (!product.isActive)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.error.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            'Inactivo',
-                            style: TextStyle(
-                              color: AppColors.error,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Categoría y código de barras
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      _MiniChip(label: product.category, icon: Icons.category_outlined),
-                      if (product.barcode != null && product.barcode!.isNotEmpty)
-                        _MiniChip(label: product.barcode!, icon: Icons.qr_code_2_rounded),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // ── Precio y stock ──
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  currencyFmt.format(product.price),
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.inventory_2_outlined,
-                      size: 14,
-                      color: _stockColor,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${product.stock} ${product.unit}',
-                      style: TextStyle(
-                        color: _stockColor,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-
-            const SizedBox(width: 6),
-            const Icon(Icons.chevron_right_rounded, color: AppColors.textDisabled, size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Color del indicador de stock según nivel
-  Color get _stockColor {
-    if (product.isOutOfStock) return AppColors.stockCritical;
-    if (product.isLowStock) return AppColors.stockWarning;
-    return AppColors.stockOk;
-  }
-}
-
-// ── Miniatura de foto de producto ─────────────────────────────
-
-class _ProductThumbnail extends StatelessWidget {
-  final String? imageUrl;
-  const _ProductThumbnail({required this.imageUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    final hasImage = imageUrl != null && imageUrl!.isNotEmpty;
-    return Container(
-      width: 44,
-      height: 44,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: AppColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: hasImage
-          ? CachedNetworkImage(
-              imageUrl: imageUrl!,
-              fit: BoxFit.cover,
-              placeholder: (_, _) => const Icon(
-                Icons.inventory_2_outlined,
-                size: 18,
-                color: AppColors.textDisabled,
-              ),
-              errorWidget: (_, _, _) => const Icon(
-                Icons.inventory_2_outlined,
-                size: 18,
-                color: AppColors.textDisabled,
-              ),
-            )
-          : const Icon(
-              Icons.inventory_2_outlined,
-              size: 18,
-              color: AppColors.textDisabled,
-            ),
-    );
-  }
-}
-
-// ── Mini Chip (categoría / barcode) ───────────────────────────
-
-class _MiniChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
-
-  const _MiniChip({required this.label, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: AppColors.textSecondary),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 11,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -564,10 +460,7 @@ class _EmptyState extends StatelessWidget {
   final bool hasFilters;
   final VoidCallback onClearFilters;
 
-  const _EmptyState({
-    required this.hasFilters,
-    required this.onClearFilters,
-  });
+  const _EmptyState({required this.hasFilters, required this.onClearFilters});
 
   @override
   Widget build(BuildContext context) {

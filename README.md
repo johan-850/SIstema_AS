@@ -1,7 +1,7 @@
 <div align="center">
 
-<img src="https://img.shields.io/badge/Flutter-3.41.4-02569B?style=for-the-badge&logo=flutter&logoColor=white" />
-<img src="https://img.shields.io/badge/Dart-3.11.1-0175C2?style=for-the-badge&logo=dart&logoColor=white" />
+<img src="https://img.shields.io/badge/Flutter-3.44.4-02569B?style=for-the-badge&logo=flutter&logoColor=white" />
+<img src="https://img.shields.io/badge/Dart-3.12.2-0175C2?style=for-the-badge&logo=dart&logoColor=white" />
 <img src="https://img.shields.io/badge/Supabase-2.x-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white" />
 <img src="https://img.shields.io/badge/Estado-En%20Desarrollo-orange?style=for-the-badge" />
 
@@ -10,16 +10,20 @@
 <br />
 
 <div align="center">
-  <h1>🛒 Abarrotería Pro</h1>
+  <h1>Abarrotería Pro</h1>
   <p><strong>Sistema de Administración y Punto de Venta para Tienda de Abarrotes</strong></p>
   <p>Flutter · Dart · Supabase · Firebase · Riverpod</p>
 </div>
 
 ---
 
-## 📋 Descripción General
+## Descripción General
 
-**Abarrotería Pro** es una aplicación móvil (Android/iOS) de gestión integral para tiendas de abarrotes. Incluye un punto de venta (POS) completo con soporte de pistola de códigos de barras Bluetooth, gestión de inventario, caja, reportes y analítica de negocio.
+**Abarrotería Pro** es una aplicación móvil (Android/iOS) de gestión integral para tiendas de abarrotes: punto de venta (POS), escaneo de códigos de barras con la cámara del celular, gestión de inventario, caja, reportes y analítica de negocio.
+
+### Estado actual
+
+Implementado y funcionando contra Supabase real: **EP-01** (autenticación y usuarios), **EP-02** (apertura de caja), **EP-03** (CRUD de productos, escaneo por cámara, import CSV, foto de producto) y **EP-04** (inventario, ajustes de stock, restock). El punto de venta (EP-05) está en desarrollo; el resto de épicas (gastos, cierre de caja, reportes, estadísticas, notificaciones) siguen pendientes — ver la tabla de [Pantallas](#pantallas) para el detalle.
 
 ### Roles del Sistema
 
@@ -30,7 +34,7 @@
 
 ---
 
-## 🏗️ Arquitectura
+## Arquitectura
 
 El proyecto sigue **Clean Architecture** por features, con separación clara en capas:
 
@@ -39,32 +43,23 @@ lib/
 ├── core/
 │   ├── constants/         # Constantes de la app
 │   ├── errors/            # Manejo de errores (Failures)
-│   ├── extensions/        # Extensions de Dart
 │   ├── router/            # GoRouter con guards de rol
 │   ├── theme/             # Design system (colores, tipografía)
 │   ├── utils/             # Utilitarios generales
-│   └── di/                # Inyección de dependencias
-│
-├── data/
-│   ├── local/             # Drift (SQLite offline)
-│   └── remote/supabase/   # Cliente y servicios Supabase
+│   └── widgets/           # Widgets compartidos entre features
 │
 └── features/
     ├── auth/              # EP-01: Login, sesiones, roles
     ├── cash_register/     # EP-02: Apertura de caja
-    ├── products/          # EP-03: CRUD productos
-    ├── inventory/         # EP-04: Stock y movimientos
-    ├── pos/               # EP-05: Punto de venta
-    ├── expenses/          # EP-06: Gastos del turno
-    ├── closing/           # EP-07: Cierre de caja
-    ├── reports/           # EP-08: Historial y reportes
-    ├── analytics/         # EP-09: Estadísticas
-    ├── bluetooth/         # EP-10: Pistola BT
-    ├── notifications/     # EP-11: Alertas y push
+    ├── products/          # EP-03: CRUD productos, escaneo, import CSV, foto
+    ├── inventory/         # EP-04: Stock, movimientos, restock
+    ├── pos/               # EP-05: Punto de venta (en desarrollo)
     ├── dashboard/         # Dashboard AM y CAJ
     ├── users/             # Gestión de cajeros (AM)
     └── settings/          # Configuración de la app
 ```
+
+Cada feature contiene su propia capa `data/` (models, datasources, repository impl), sin una carpeta `data/` compartida a nivel raíz — así se mantiene cada épica autocontenida. Las épicas EP-06 en adelante (gastos, cierre de caja, reportes, estadísticas, Bluetooth, notificaciones) todavía no tienen feature propia.
 
 ### Patrón por Feature
 
@@ -82,18 +77,17 @@ feature/
 
 ---
 
-## 🔧 Stack Tecnológico
+## Stack Tecnológico
 
 | Capa | Tecnología | Uso |
 |------|-----------|-----|
-| **UI** | Flutter 3.41 + Dart 3.11 | Interfaz multiplataforma |
+| **UI** | Flutter 3.44 + Dart 3.12 | Interfaz multiplataforma |
 | **Estado** | Riverpod 2.x + riverpod_generator | Gestión de estado reactivo |
 | **Backend** | Supabase (PostgreSQL) | Base de datos + Auth + Storage + Realtime |
 | **Auth** | Supabase Auth (JWT + RLS) | Roles por metadata |
-| **DB Local** | Drift (SQLite) | Modo offline |
-| **Push** | Firebase Messaging (FCM) | Notificaciones push |
-| **Bluetooth** | flutter_blue_plus | Pistola lectora HID |
-| **Barcode** | mobile_scanner | Escáner por cámara |
+| **DB Local** | Drift (SQLite) | Modo offline (dependencia instalada, sin integrar aún) |
+| **Push** | Firebase Messaging (FCM) | Notificaciones push (dependencia instalada, sin integrar aún) |
+| **Barcode** | mobile_scanner | Escáner por cámara (reemplaza la pistola Bluetooth del backlog original) |
 | **PDF** | pdf + printing | Recibos y reportes |
 | **Charts** | fl_chart | Gráficas y tendencias |
 | **Navegación** | GoRouter | Rutas con guards de rol |
@@ -101,7 +95,7 @@ feature/
 
 ---
 
-## 🗄️ Modelo de Base de Datos (Supabase)
+## Modelo de Base de Datos (Supabase)
 
 ```sql
 users              -- Perfil de usuarios con rol (adminmaster | cajero)
@@ -118,7 +112,7 @@ expense_categories -- Categorías de gasto configurables
 
 ---
 
-## 📦 Épicas del Product Backlog
+## Épicas del Product Backlog
 
 | # | Épica | US | SP | Sprint |
 |---|-------|----|----|--------|
@@ -138,12 +132,12 @@ expense_categories -- Categorías de gasto configurables
 
 ---
 
-## 🚀 Configuración del Proyecto
+## Configuración del Proyecto
 
 ### Prerrequisitos
 
-- [Flutter SDK](https://flutter.dev) ≥ 3.41.4
-- [Dart SDK](https://dart.dev) ≥ 3.11.1
+- [Flutter SDK](https://flutter.dev) ≥ 3.44.4
+- [Dart SDK](https://dart.dev) ≥ 3.12.2
 - Cuenta en [Supabase](https://supabase.com)
 - Cuenta en [Firebase](https://firebase.google.com) (para push notifications)
 - Android Studio / VS Code con extensión Flutter
@@ -167,7 +161,9 @@ SUPABASE_URL=https://xxxx.supabase.co
 SUPABASE_ANON_KEY=your_anon_key
 ```
 
-### 3. Configurar Firebase
+### 3. Configurar Firebase (opcional por ahora)
+
+La dependencia de Firebase Messaging ya está en `pubspec.yaml`, pero todavía no está conectada a ningún flujo del código (EP-11, notificaciones push, sigue pendiente). Puedes omitir este paso hasta que esa épica se implemente:
 
 1. Crea un proyecto en [Firebase Console](https://console.firebase.google.com)
 2. Descarga `google-services.json` → `android/app/`
@@ -193,15 +189,21 @@ flutter run
 
 ---
 
-## 🗃️ Script SQL — Supabase
+## Migraciones SQL — Supabase
 
-Ejecuta el script en **SQL Editor** de tu proyecto Supabase:
+Ejecuta los scripts, **en orden**, en el **SQL Editor** de tu proyecto Supabase (no hay CLI de Supabase configurada en este repo, así que se aplican manualmente):
 
-> `supabase/migrations/001_initial_schema.sql` *(próximamente)*
+| Migración | Contenido |
+|-----------|-----------|
+| `supabase/migrations/001_ep01_auth_users.sql` | `profiles`, `user_activity_logs`, triggers de alta/último login, RLS por rol |
+| `supabase/migrations/002_ep03_product_images_storage.sql` | Bucket `product-images` + políticas RLS para fotos de producto |
+| `supabase/migrations/003_ep04_inventory.sql` | `stock_movements`, `restock_requests`, función atómica `adjust_product_stock`, Realtime sobre `products` |
+
+Las tablas `products`, `cash_registers` y `stock_movements` referenciadas en el código de EP-02/EP-03 aún no tienen una migración formal previa (se asumen creadas manualmente desde el Dashboard) — es una deuda técnica conocida, no un olvido de este README.
 
 ---
 
-## 🔐 Seguridad y RLS
+## Seguridad y RLS
 
 - Todas las tablas tienen **Row Level Security** habilitado
 - Los cajeros solo acceden a datos de su propio turno activo
@@ -210,27 +212,28 @@ Ejecuta el script en **SQL Editor** de tu proyecto Supabase:
 
 ---
 
-## 📱 Pantallas Planificadas
+## Pantallas
 
-| Pantalla | Rol | US |
-|---------|-----|----|
-| Login | AM / CAJ | US-001, US-002 |
-| Dashboard Admin | AM | US-048 |
-| Apertura de Caja | CAJ | US-008, US-009 |
-| Punto de Venta (POS) | CAJ | US-025 → US-033 |
-| Catálogo de Productos | AM | US-013 → US-019 |
-| Inventario | AM | US-020 → US-024 |
-| Gastos de Turno | CAJ | US-034, US-035 |
-| Cierre de Caja | CAJ | US-039 → US-042 |
-| Historial de Ventas | AM | US-044 → US-049 |
-| Estadísticas | AM | US-050 → US-054 |
-| Gestión de Cajeros | AM | US-003 → US-007 |
-| Configuración BT | AM/CAJ | US-055 → US-058 |
-| Centro de Alertas | AM | US-059 → US-062 |
+| Pantalla | Rol | US | Estado |
+|---------|-----|----|--------|
+| Login | AM / CAJ | US-001, US-002 | Listo |
+| Dashboard Admin | AM | US-048 | Listo |
+| Gestión de Cajeros | AM | US-003 → US-007 | Listo |
+| Apertura de Caja | CAJ | US-008, US-009 | Listo |
+| Catálogo de Productos (AM) | AM | US-013 → US-019 | Listo |
+| Catálogo de solo lectura (CAJ) | CAJ | US-018 | Listo |
+| Inventario y Stock | AM | US-020 → US-024 | Listo |
+| Punto de Venta (POS) | CAJ | US-025 → US-033 | En desarrollo |
+| Gastos de Turno | CAJ | US-034, US-035 | Pendiente |
+| Cierre de Caja | CAJ | US-039 → US-042 | Pendiente |
+| Historial de Ventas | AM | US-044 → US-049 | Pendiente |
+| Estadísticas | AM | US-050 → US-054 | Pendiente |
+| Configuración BT | AM/CAJ | US-055 → US-058 | Pendiente (se reemplazó por escaneo con cámara en US-013/US-018) |
+| Centro de Alertas | AM | US-059 → US-062 | Pendiente |
 
 ---
 
-## 🗺️ Roadmap de Sprints
+## Roadmap de Sprints
 
 | Sprint | Foco | SP |
 |--------|------|----|
@@ -250,22 +253,22 @@ Ejecuta el script en **SQL Editor** de tu proyecto Supabase:
 
 ---
 
-## 🤝 Contribución
+## Contribución
 
-Este es un proyecto privado de desarrollo activo. Para contribuir:
+Este es un proyecto privado de desarrollo activo. El flujo real que se viene usando es una rama por épica:
 
-1. Crea una rama desde `develop`: `git checkout -b feature/US-XXX-descripcion`
-2. Implementa la historia de usuario correspondiente
-3. Crea un Pull Request hacia `develop` con referencia al US-ID
+1. Crea una rama desde `develop`: `git checkout -b epica_N`
+2. Implementa las historias de usuario de esa épica (commits con formato `feat(epN): US-XXX - descripción`)
+3. Crea un Pull Request hacia `develop` referenciando los US-ID incluidos
 
 ---
 
-## 📄 Licencia
+## Licencia
 
 Todos los derechos reservados © 2026 — Abarrotería Pro
 
 ---
 
 <div align="center">
-  <sub>Desarrollado con ❤️ usando Flutter & Supabase</sub>
+  <sub>Desarrollado con Flutter & Supabase</sub>
 </div>

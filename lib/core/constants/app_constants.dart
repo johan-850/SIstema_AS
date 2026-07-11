@@ -39,6 +39,14 @@ abstract class AppConstants {
     'ajuste',
   ];
 
+  // ── Tablas / RPC Supabase — EP-05 ─────────────────────────
+  static const String tableSales      = 'sales';
+  static const String tableSaleItems  = 'sale_items';
+  static const String rpcConfirmSale  = 'confirm_sale';
+
+  /// Métodos de pago disponibles en el cobro (US-030)
+  static const List<String> paymentMethods = ['efectivo', 'transferencia', 'mixto'];
+
   // ── Edge Functions ────────────────────────────────────────
   static const String fnCreateCashier        = 'create-cashier';
   static const String fnToggleCashierStatus  = 'toggle-cashier-status';

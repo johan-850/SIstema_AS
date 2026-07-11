@@ -1,0 +1,305 @@
+// ============================================================
+// lib/features/pos/presentation/pages/cart_page.dart
+// Carrito de venta — US-027, US-028
+// Sin botón de cobro todavía (se agrega en S-06).
+// ============================================================
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/app_snackbar.dart';
+import '../../../../core/widgets/confirmation_dialog.dart';
+import '../../../../core/widgets/product_thumbnail.dart';
+import '../../domain/entities/cart_item.dart';
+import '../providers/cart_providers.dart';
+import 'checkout_page.dart';
+
+class CartPage extends ConsumerWidget {
+  const CartPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(cartProvider);
+    final notifier = ref.read(cartProvider.notifier);
+    final currencyFmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+
+    ref.listen<CartState>(cartProvider, (_, next) {
+      if (next.warningMessage != null) {
+        AppSnackbar.warning(context, next.warningMessage!);
+      }
+    });
+
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      appBar: AppBar(
+        title: const Text('Carrito'),
+        actions: [
+          if (state.items.isNotEmpty)
+            IconButton(
+              tooltip: 'Vaciar carrito',
+              icon: const Icon(Icons.delete_sweep_outlined),
+              onPressed: () => _confirmClear(context, notifier),
+            ),
+        ],
+      ),
+      body: state.items.isEmpty
+          ? const Center(
+              child: Text('El carrito está vacío', style: TextStyle(color: AppColors.textSecondary)),
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: state.items.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
+              itemBuilder: (context, i) {
+                final item = state.items[i];
+                return _CartItemTile(
+                  item: item,
+                  currencyFmt: currencyFmt,
+                  onIncrement: () => notifier.updateQuantity(item.productId, item.quantity + 1),
+                  onDecrement: () {
+                    if (item.quantity <= 1) {
+                      _confirmRemove(context, notifier, item);
+                    } else {
+                      notifier.updateQuantity(item.productId, item.quantity - 1);
+                    }
+                  },
+                  onQuantityChanged: (qty) {
+                    if (qty <= 0) {
+                      _confirmRemove(context, notifier, item);
+                    } else {
+                      notifier.updateQuantity(item.productId, qty);
+                    }
+                  },
+                  onRemove: () => _confirmRemove(context, notifier, item),
+                );
+              },
+            ),
+      bottomNavigationBar: state.items.isEmpty
+          ? null
+          : SafeArea(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: AppColors.surfaceCard,
+                  border: Border(top: BorderSide(color: AppColors.border)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${state.totalItems} ítem${state.totalItems == 1 ? '' : 's'}',
+                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                        ),
+                        Text(
+                          currencyFmt.format(state.totalAmount),
+                          style: const TextStyle(
+                              color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 20),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const CheckoutPage()),
+                        ),
+                        icon: const Icon(Icons.point_of_sale_rounded),
+                        label: const Text('Cobrar'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
+  Future<void> _confirmRemove(BuildContext context, CartNotifier notifier, CartItem item) {
+    return ConfirmationDialog.show(
+      context,
+      title: 'Eliminar producto',
+      message: '¿Eliminar "${item.name}" del carrito?',
+      confirmLabel: 'Eliminar',
+      isDangerous: true,
+      onConfirm: () => notifier.removeItem(item.productId),
+    );
+  }
+
+  Future<void> _confirmClear(BuildContext context, CartNotifier notifier) {
+    return ConfirmationDialog.show(
+      context,
+      title: 'Vaciar carrito',
+      message: '¿Seguro que quieres quitar todos los productos del carrito?',
+      confirmLabel: 'Vaciar',
+      isDangerous: true,
+      onConfirm: notifier.clear,
+    );
+  }
+}
+
+class _CartItemTile extends StatefulWidget {
+  final CartItem item;
+  final NumberFormat currencyFmt;
+  final VoidCallback onIncrement;
+  final VoidCallback onDecrement;
+  final ValueChanged<int> onQuantityChanged;
+  final VoidCallback onRemove;
+
+  const _CartItemTile({
+    required this.item,
+    required this.currencyFmt,
+    required this.onIncrement,
+    required this.onDecrement,
+    required this.onQuantityChanged,
+    required this.onRemove,
+  });
+
+  @override
+  State<_CartItemTile> createState() => _CartItemTileState();
+}
+
+class _CartItemTileState extends State<_CartItemTile> {
+  late final TextEditingController _qtyController;
+  final _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _qtyController = TextEditingController(text: '${widget.item.quantity}');
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus) _submit();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _CartItemTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item.quantity != widget.item.quantity && !_focusNode.hasFocus) {
+      _qtyController.text = '${widget.item.quantity}';
+    }
+  }
+
+  @override
+  void dispose() {
+    _qtyController.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final qty = int.tryParse(_qtyController.text);
+    if (qty == null) {
+      _qtyController.text = '${widget.item.quantity}';
+      return;
+    }
+    widget.onQuantityChanged(qty);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ProductThumbnail(imageUrl: widget.item.imageUrl),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.item.name,
+                    style: const TextStyle(
+                        color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 2),
+                Text(
+                  '${widget.currencyFmt.format(widget.item.unitPrice)} c/u',
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _StepButton(icon: Icons.remove_rounded, onTap: widget.onDecrement),
+                    SizedBox(
+                      width: 44,
+                      height: 32,
+                      child: TextField(
+                        controller: _qtyController,
+                        focusNode: _focusNode,
+                        textAlign: TextAlign.center,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.symmetric(vertical: 4),
+                        ),
+                        onSubmitted: (_) => _submit(),
+                      ),
+                    ),
+                    _StepButton(icon: Icons.add_rounded, onTap: widget.onIncrement),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                widget.currencyFmt.format(widget.item.subtotal),
+                style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+              IconButton(
+                tooltip: 'Eliminar',
+                icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 20),
+                onPressed: widget.onRemove,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _StepButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 28,
+        height: 28,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Icon(icon, size: 16, color: AppColors.primary),
+      ),
+    );
+  }
+}

@@ -8,6 +8,7 @@ import '../../features/dashboard/presentation/pages/admin_dashboard_page.dart';
 import '../../features/dashboard/presentation/pages/admin_cash_registers_page.dart';
 import '../../features/cash_register/presentation/pages/cash_register_opening_page.dart';
 import '../../features/pos/presentation/pages/pos_page.dart';
+import '../../features/pos/presentation/pages/cart_page.dart';
 import '../../features/products/presentation/pages/products_list_page.dart';
 import '../../features/products/presentation/pages/product_form_page.dart';
 import '../../features/products/presentation/pages/product_csv_import_page.dart';
@@ -27,6 +28,7 @@ abstract class AppRoutes {
   static const cashRegisterOpening  = '/cash-register/opening';
   static const cashRegistersHistory = '/admin/cash-registers';   // US-011
   static const pos                  = '/pos';
+  static const cart                 = '/pos/cart';               // US-027/US-028
   static const catalog              = '/catalog';               // US-018
   static const products             = '/admin/products';
   static const inventory            = '/admin/inventory';       // US-020
@@ -90,6 +92,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.pos,
         name: 'pos',
         builder: (_, _) => const PosPage(),
+      ),
+      // US-027/US-028: Carrito de venta
+      GoRoute(
+        path: AppRoutes.cart,
+        name: 'pos-cart',
+        builder: (_, _) => const CartPage(),
       ),
       GoRoute(
         path: AppRoutes.users,

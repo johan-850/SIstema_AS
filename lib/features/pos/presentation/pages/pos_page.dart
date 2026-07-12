@@ -1,30 +1,472 @@
 // ============================================================
 // lib/features/pos/presentation/pages/pos_page.dart
-// Punto de Venta — US-025 al US-033
+// Punto de Venta — US-025, US-026, US-033
+// (cobro/descuentos/recibo quedan para S-06)
 // ============================================================
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
-class PosPage extends StatelessWidget {
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/widgets/app_snackbar.dart';
+import '../../../../core/widgets/product_thumbnail.dart';
+import '../../../../core/widgets/barcode_scanner_page.dart';
+import '../../../auth/presentation/providers/auth_providers.dart';
+import '../../../cash_register/domain/entities/cash_register.dart';
+import '../../../cash_register/presentation/providers/cash_register_providers.dart';
+import '../../../products/domain/entities/product.dart';
+import '../../../products/presentation/providers/product_providers.dart'
+    show getProductByBarcodeUseCaseProvider;
+import '../providers/cart_providers.dart';
+import '../providers/pos_catalog_provider.dart';
+
+class PosPage extends ConsumerStatefulWidget {
   const PosPage({super.key});
+
+  @override
+  ConsumerState<PosPage> createState() => _PosPageState();
+}
+
+class _PosPageState extends ConsumerState<PosPage> {
+  final _searchController = TextEditingController();
+  final _priceFmt = NumberFormat('#,###', 'es_CO');
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activeRegisterAsync = ref.watch(activeRegisterProvider);
+
+    return activeRegisterAsync.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      ),
+      error: (_, _) => const Scaffold(
+        body: Center(
+          child: Text('Error al verificar la caja activa', style: TextStyle(color: AppColors.error)),
+        ),
+      ),
+      data: (register) {
+        if (register == null || !register.isOpen) {
+          return _NoOpenRegisterScaffold(
+            onOpenRegister: () => context.go('/cash-register/opening'),
+          );
+        }
+        return _buildPos(context, register);
+      },
+    );
+  }
+
+  Widget _buildPos(BuildContext context, CashRegister register) {
+    final user = ref.watch(authStateStreamProvider).valueOrNull;
+    final catalogState = ref.watch(posCatalogProvider);
+    final catalogNotifier = ref.read(posCatalogProvider.notifier);
+    final cartState = ref.watch(cartProvider);
+
+    ref.listen<CartState>(cartProvider, (_, next) {
+      if (next.warningMessage != null) {
+        AppSnackbar.warning(context, next.warningMessage!);
+      }
+    });
+
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+              child: Text(
+                _initials(user?.name ?? ''),
+                style: const TextStyle(
+                    color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text('CAJA PRINCIPAL', style: TextStyle(fontSize: 15, letterSpacing: 0.5)),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Info del turno',
+            icon: const Icon(Icons.access_time_rounded),
+            onPressed: () => _showShiftInfo(context, register),
+          ),
+          IconButton(
+            tooltip: 'Configuración',
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => context.push('/settings'),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // ── Buscador ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              onChanged: catalogNotifier.search,
+              style: const TextStyle(color: AppColors.textPrimary),
+              decoration: InputDecoration(
+                hintText: 'Buscar producto o código...',
+                hintStyle: const TextStyle(color: AppColors.textDisabled),
+                prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textSecondary),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.shopping_bag_outlined, color: AppColors.textSecondary),
+                  onPressed: () => context.push('/pos/cart'),
+                ),
+                filled: true,
+                fillColor: AppColors.surfaceElevated,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+              ),
+            ),
+          ),
+
+          // ── Chips de categoría ──
+          SizedBox(
+            height: 40,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                _CategoryChip(
+                  label: 'Todos',
+                  selected: catalogState.filterCategory == null,
+                  onTap: () => catalogNotifier.filterByCategory(null),
+                ),
+                const SizedBox(width: 8),
+                ...AppConstants.productCategories.map((cat) => Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _CategoryChip(
+                        label: cat,
+                        selected: catalogState.filterCategory == cat,
+                        onTap: () => catalogNotifier.filterByCategory(cat),
+                      ),
+                    )),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // ── Listado de productos ──
+          Expanded(
+            child: catalogState.isLoading
+                ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                : catalogState.products.isEmpty
+                    ? const Center(
+                        child: Text('Sin resultados', style: TextStyle(color: AppColors.textSecondary)),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        itemCount: catalogState.products.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (context, i) {
+                          final p = catalogState.products[i];
+                          return _VentaProductTile(
+                            product: p,
+                            priceFmt: _priceFmt,
+                            onAdd: () => ref.read(cartProvider.notifier).addProduct(p),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: _PosBottomNav(
+        cartItemCount: cartState.totalItems,
+        onScan: _scanAndAdd,
+      ),
+    );
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+
+  void _showShiftInfo(BuildContext context, CashRegister register) {
+    final dateFmt = DateFormat('dd/MM/yyyy hh:mm a', 'es');
+    final currencyFmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Turno actual',
+                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700, fontSize: 17)),
+            const SizedBox(height: 16),
+            _ShiftInfoRow(label: 'Apertura', value: dateFmt.format(register.openingTime.toLocal())),
+            const SizedBox(height: 8),
+            _ShiftInfoRow(label: 'Monto inicial', value: currencyFmt.format(register.openingAmount)),
+            if (register.notes != null && register.notes!.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _ShiftInfoRow(label: 'Notas', value: register.notes!),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// US-025: escanea con la cámara, busca el producto y lo agrega.
+  Future<void> _scanAndAdd() async {
+    final code = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const BarcodeScannerPage()),
+    );
+    if (code == null || !mounted) return;
+
+    final result = await ref.read(getProductByBarcodeUseCaseProvider)(code);
+    final product = result.product;
+    if (!mounted) return;
+
+    if (product == null || !product.isActive) {
+      AppSnackbar.error(context, 'Producto no encontrado.');
+      return;
+    }
+
+    HapticFeedback.mediumImpact();
+    ref.read(cartProvider.notifier).addProduct(product);
+  }
+}
+
+class _ShiftInfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _ShiftInfoRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 100,
+          child: Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+        ),
+        Expanded(
+          child: Text(value, style: const TextStyle(color: AppColors.textPrimary, fontSize: 13)),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Barra de navegación inferior (Ventas / Stock / Escanear / Carrito) ─
+
+class _PosBottomNav extends StatelessWidget {
+  final int cartItemCount;
+  final VoidCallback onScan;
+
+  const _PosBottomNav({required this.cartItemCount, required this.onScan});
+
+  @override
+  Widget build(BuildContext context) {
+    return BottomNavigationBar(
+      currentIndex: 0,
+      type: BottomNavigationBarType.fixed,
+      backgroundColor: AppColors.surfaceCard,
+      selectedItemColor: AppColors.primary,
+      unselectedItemColor: AppColors.textSecondary,
+      onTap: (i) {
+        switch (i) {
+          case 0:
+            break; // Ventas: ya estamos aquí
+          case 1:
+            context.push('/catalog');
+            break;
+          case 2:
+            onScan();
+            break;
+          case 3:
+            context.push('/pos/cart');
+            break;
+        }
+      },
+      items: [
+        const BottomNavigationBarItem(icon: Icon(Icons.storefront_rounded), label: 'Ventas'),
+        const BottomNavigationBarItem(icon: Icon(Icons.inventory_2_outlined), label: 'Stock'),
+        const BottomNavigationBarItem(icon: Icon(Icons.qr_code_scanner_rounded), label: 'Escanear'),
+        BottomNavigationBarItem(
+          icon: Badge(
+            isLabelVisible: cartItemCount > 0,
+            label: Text('$cartItemCount'),
+            backgroundColor: AppColors.primary,
+            textColor: Colors.black,
+            child: const Icon(Icons.shopping_cart_outlined),
+          ),
+          label: 'Carrito',
+        ),
+      ],
+    );
+  }
+}
+
+// ── Pantalla cuando no hay caja abierta ────────────────────────
+
+class _NoOpenRegisterScaffold extends StatelessWidget {
+  final VoidCallback onOpenRegister;
+  const _NoOpenRegisterScaffold({required this.onOpenRegister});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Punto de Venta'),
-        actions: [
-          // US-018: único punto de entrada del Cajero al catálogo por ahora
-          IconButton(
-            tooltip: 'Ver catálogo',
-            icon: const Icon(Icons.inventory_2_outlined),
-            onPressed: () => context.push('/catalog'),
+      backgroundColor: AppColors.surface,
+      appBar: AppBar(title: const Text('Punto de Venta')),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.point_of_sale_outlined, size: 56, color: AppColors.textDisabled),
+              const SizedBox(height: 16),
+              const Text(
+                'Debes abrir caja antes de vender',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: onOpenRegister,
+                icon: const Icon(Icons.lock_open_rounded),
+                label: const Text('Abrir caja'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Chip de categoría ───────────────────────────────────────────
+
+class _CategoryChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CategoryChip({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary.withValues(alpha: 0.15) : AppColors.surfaceElevated,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? AppColors.primary : AppColors.border),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label.toUpperCase(),
+          style: TextStyle(
+            color: selected ? AppColors.primary : AppColors.textSecondary,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.4,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Fila de producto en "Ventas" ────────────────────────────────
+
+class _VentaProductTile extends StatelessWidget {
+  final Product product;
+  final NumberFormat priceFmt;
+  final VoidCallback onAdd;
+
+  const _VentaProductTile({required this.product, required this.priceFmt, required this.onAdd});
+
+  @override
+  Widget build(BuildContext context) {
+    final outOfStock = product.isOutOfStock;
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          ProductThumbnail(imageUrl: product.imageUrl),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(product.name,
+                    style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700, fontSize: 14),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 2),
+                Text(
+                  outOfStock ? 'Agotado' : '${product.stock} ${product.unit} stock',
+                  style: TextStyle(
+                    color: outOfStock ? AppColors.error : AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${priceFmt.format(product.price)}\$',
+            style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 15),
+          ),
+          const SizedBox(width: 10),
+          InkWell(
+            onTap: outOfStock ? null : onAdd,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: outOfStock
+                    ? AppColors.surfaceElevated
+                    : AppColors.primary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: outOfStock ? AppColors.border : AppColors.primary),
+              ),
+              child: Icon(Icons.add_rounded,
+                  size: 18, color: outOfStock ? AppColors.textDisabled : AppColors.primary),
+            ),
           ),
         ],
-      ),
-      body: const Center(
-        child: Text('POS — en desarrollo'),
       ),
     );
   }

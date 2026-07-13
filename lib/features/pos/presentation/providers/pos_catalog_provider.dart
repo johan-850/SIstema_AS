@@ -9,7 +9,9 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../products/domain/entities/product.dart';
 import '../../../products/domain/use_cases/product_use_cases.dart';
 import '../../../products/presentation/providers/product_providers.dart'
@@ -52,9 +54,16 @@ class PosCatalogState {
 class PosCatalogNotifier extends StateNotifier<PosCatalogState> {
   final GetProductsUseCase _getProducts;
   Timer? _debounce;
+  StreamSubscription<List<Map<String, dynamic>>>? _realtimeSub;
 
-  PosCatalogNotifier(this._getProducts) : super(const PosCatalogState()) {
+  PosCatalogNotifier(this._getProducts, SupabaseClient client) : super(const PosCatalogState()) {
     load();
+    // Refresco en tiempo real cuando cambia la tabla products (ej. un
+    // ajuste de stock, una venta o una edición hecha desde otra sesión)
+    // — mismo criterio que InventoryListNotifier (EP-04).
+    _realtimeSub = client.from('products').stream(primaryKey: ['id']).listen((_) {
+      load();
+    });
   }
 
   Future<void> load() async {
@@ -92,11 +101,12 @@ class PosCatalogNotifier extends StateNotifier<PosCatalogState> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _realtimeSub?.cancel();
     super.dispose();
   }
 }
 
 final posCatalogProvider =
     StateNotifierProvider.autoDispose<PosCatalogNotifier, PosCatalogState>(
-  (ref) => PosCatalogNotifier(ref.read(getProductsUseCaseProvider)),
+  (ref) => PosCatalogNotifier(ref.read(getProductsUseCaseProvider), ref.read(supabaseClientProvider)),
 );

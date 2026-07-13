@@ -20,6 +20,11 @@ class CartItem extends Equatable {
   /// para no dejar que el carrito supere lo que hay en existencia.
   final int availableStock;
 
+  /// US-059: stock mínimo configurado del producto — junto con
+  /// [availableStock] y [quantity] permite calcular en vivo qué tan
+  /// cerca está de agotarse a medida que cambia la cantidad en el carrito.
+  final int minStock;
+
   const CartItem({
     required this.productId,
     required this.name,
@@ -29,9 +34,14 @@ class CartItem extends Equatable {
     required this.unit,
     required this.quantity,
     required this.availableStock,
+    this.minStock = 0,
   });
 
   double get subtotal => unitPrice * quantity;
+
+  /// Stock que quedaría del producto si se confirmara la venta con la
+  /// cantidad actual del carrito.
+  int get remainingStock => availableStock - quantity;
 
   CartItem copyWith({int? quantity}) => CartItem(
         productId: productId,
@@ -42,6 +52,7 @@ class CartItem extends Equatable {
         unit: unit,
         quantity: quantity ?? this.quantity,
         availableStock: availableStock,
+        minStock: minStock,
       );
 
   @override

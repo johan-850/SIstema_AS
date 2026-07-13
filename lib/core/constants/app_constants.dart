@@ -40,12 +40,19 @@ abstract class AppConstants {
   ];
 
   // ── Tablas / RPC Supabase — EP-05 ─────────────────────────
-  static const String tableSales      = 'sales';
-  static const String tableSaleItems  = 'sale_items';
-  static const String rpcConfirmSale  = 'confirm_sale';
+  static const String tableSales             = 'sales';
+  static const String tableSaleItems         = 'sale_items';
+  static const String rpcConfirmSale         = 'confirm_sale';
+  static const String tableSaleCancellations = 'sale_cancellations';
+  static const String tableLowStockAlerts    = 'low_stock_alerts';
 
   /// Métodos de pago disponibles en el cobro (US-030)
   static const List<String> paymentMethods = ['efectivo', 'transferencia', 'mixto'];
+
+  // ── QR de pago y comprobante de transferencia ──────────────
+  static const String tableStoreSettings           = 'store_settings';
+  static const String storageBucketStoreAssets     = 'store-assets';
+  static const String storageBucketReceiptPhotos   = 'receipt-photos';
 
   // ── Edge Functions ────────────────────────────────────────
   static const String fnCreateCashier        = 'create-cashier';

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/confirmation_dialog.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
+import '../providers/store_settings_providers.dart';
 
 /// US-005 — Configuración general con logout seguro para AM y Cajero
 class SettingsPage extends ConsumerWidget {
@@ -69,6 +71,12 @@ class SettingsPage extends ConsumerWidget {
               ),
             ),
 
+          // ── QR de pago (solo AdminMaster) ──────────────────
+          if (user != null && user.isAdmin) ...[
+            const SizedBox(height: 20),
+            const _QrSettingsCard(),
+          ],
+
           const SizedBox(height: 24),
           const Divider(),
           const SizedBox(height: 8),
@@ -103,6 +111,203 @@ class SettingsPage extends ConsumerWidget {
             AppSnackbar.error(context, result.failure?.message ?? 'Error al cerrar sesión');
           }
         }
+      },
+    );
+  }
+}
+
+/// Tarjeta para que el AdminMaster suba el QR real de pago del negocio.
+/// El cajero lo verá en la pantalla de cobro cuando elija "Transferencia"
+/// o "Mixto" — hasta que se suba, esa pantalla muestra un aviso.
+class _QrSettingsCard extends ConsumerStatefulWidget {
+  const _QrSettingsCard();
+
+  @override
+  ConsumerState<_QrSettingsCard> createState() => _QrSettingsCardState();
+}
+
+class _QrSettingsCardState extends ConsumerState<_QrSettingsCard> {
+  bool _isUploading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final settingsAsync = ref.watch(storeSettingsProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.qr_code_2_rounded, color: AppColors.primary, size: 20),
+              SizedBox(width: 8),
+              Text('QR de pago (Transferencias)',
+                  style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 15)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'El cajero lo mostrará al cliente cuando cobre por transferencia.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          ),
+          const SizedBox(height: 14),
+          settingsAsync.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+            ),
+            error: (_, _) => const Text(
+              'No se pudo cargar la configuración.',
+              style: TextStyle(color: AppColors.error, fontSize: 13),
+            ),
+            data: (settings) => _buildContent(context, settings?.qrImageUrl),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent(BuildContext context, String? qrImageUrl) {
+    final hasQr = qrImageUrl != null && qrImageUrl.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Center(
+          child: Container(
+            width: 160,
+            height: 160,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceElevated,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: _isUploading
+                ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                : hasQr
+                    ? Image.network(qrImageUrl, fit: BoxFit.contain)
+                    : const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(12),
+                          child: Text(
+                            'Aún no se ha configurado el QR',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: AppColors.textDisabled, fontSize: 12),
+                          ),
+                        ),
+                      ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _isUploading ? null : () => _showImageSourceSheet(hasQr ? qrImageUrl : null),
+                icon: const Icon(Icons.upload_rounded, size: 18),
+                label: Text(hasQr ? 'Cambiar QR' : 'Subir QR'),
+              ),
+            ),
+            if (hasQr) ...[
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Quitar QR',
+                icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+                onPressed: _isUploading ? null : () => _confirmRemove(qrImageUrl),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _showImageSourceSheet(String? currentUrl) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded, color: AppColors.primary),
+              title: const Text('Tomar foto', style: TextStyle(color: AppColors.textPrimary)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAndUpload(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
+              title: const Text('Elegir de galería', style: TextStyle(color: AppColors.textPrimary)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAndUpload(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndUpload(ImageSource source) async {
+    final XFile? picked;
+    try {
+      picked = await ImagePicker().pickImage(source: source, maxWidth: 1024, imageQuality: 85);
+    } catch (_) {
+      if (mounted) AppSnackbar.error(context, 'No se pudo acceder a la cámara/galería.');
+      return;
+    }
+    if (picked == null || !mounted) return;
+
+    setState(() => _isUploading = true);
+
+    final bytes = await picked.readAsBytes();
+    final ext = picked.name.contains('.') ? picked.name.split('.').last : 'jpg';
+    final result = await ref.read(updateQrImageUseCaseProvider)(bytes, ext);
+
+    if (!mounted) return;
+    setState(() => _isUploading = false);
+
+    if (result.failure != null) {
+      AppSnackbar.error(context, result.failure!.message);
+      return;
+    }
+    ref.invalidate(storeSettingsProvider);
+    AppSnackbar.success(context, 'QR actualizado');
+  }
+
+  Future<void> _confirmRemove(String currentUrl) {
+    return ConfirmationDialog.show(
+      context,
+      title: 'Quitar QR',
+      message: '¿Seguro que quieres quitar el QR de pago? El cajero dejará de verlo al cobrar.',
+      confirmLabel: 'Quitar',
+      isDangerous: true,
+      onConfirm: () async {
+        setState(() => _isUploading = true);
+        final result = await ref.read(removeQrImageUseCaseProvider)(currentUrl);
+        if (!mounted) return;
+        setState(() => _isUploading = false);
+        if (result.failure != null) {
+          AppSnackbar.error(context, result.failure!.message);
+          return;
+        }
+        ref.invalidate(storeSettingsProvider);
       },
     );
   }

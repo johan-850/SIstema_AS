@@ -12,6 +12,7 @@ class Sale extends Equatable {
   final double? cashAmount;
   final double? transferAmount;
   final double? changeAmount;
+  final String? receiptPhotoUrl;
   final DateTime createdAt;
 
   const Sale({
@@ -21,6 +22,7 @@ class Sale extends Equatable {
     this.cashAmount,
     this.transferAmount,
     this.changeAmount,
+    this.receiptPhotoUrl,
     required this.createdAt,
   });
 

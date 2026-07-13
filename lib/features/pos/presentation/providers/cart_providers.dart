@@ -8,11 +8,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/cart_item.dart';
 import '../../../products/domain/entities/product.dart';
 
+/// US-059: info mínima para mostrar el banner de stock bajo y
+/// registrar la alerta — se resuelve en la capa de presentación
+/// (el notifier no toca la red).
+typedef LowStockAlert = ({String productId, String productName, int stock});
+
 class CartState {
   final List<CartItem> items;
   final String? warningMessage;
+  final LowStockAlert? lowStockAlert;
 
-  const CartState({this.items = const [], this.warningMessage});
+  const CartState({this.items = const [], this.warningMessage, this.lowStockAlert});
 
   int get totalItems => items.fold(0, (sum, i) => sum + i.quantity);
   double get totalAmount => items.fold(0.0, (sum, i) => sum + i.subtotal);
@@ -22,10 +28,13 @@ class CartState {
     List<CartItem>? items,
     String? warningMessage,
     bool clearWarning = false,
+    LowStockAlert? lowStockAlert,
+    bool clearLowStockAlert = false,
   }) =>
       CartState(
         items: items ?? this.items,
         warningMessage: clearWarning ? null : (warningMessage ?? this.warningMessage),
+        lowStockAlert: clearLowStockAlert ? null : (lowStockAlert ?? this.lowStockAlert),
       );
 }
 
@@ -42,6 +51,10 @@ class CartNotifier extends StateNotifier<CartState> {
       return;
     }
 
+    final lowStockAlert = product.isLowStock
+        ? (productId: product.id, productName: product.name, stock: product.stock)
+        : null;
+
     final index = state.items.indexWhere((i) => i.productId == product.id);
 
     if (index == -1) {
@@ -55,8 +68,14 @@ class CartNotifier extends StateNotifier<CartState> {
         unit: product.unit,
         quantity: qty,
         availableStock: product.stock,
+        minStock: product.minStock,
       );
-      state = state.copyWith(items: [...state.items, item], clearWarning: true);
+      state = state.copyWith(
+        items: [...state.items, item],
+        clearWarning: true,
+        lowStockAlert: lowStockAlert,
+        clearLowStockAlert: lowStockAlert == null,
+      );
       return;
     }
 
@@ -75,6 +94,8 @@ class CartNotifier extends StateNotifier<CartState> {
     state = state.copyWith(
       items: _replaceQuantity(existing.productId, desiredQty),
       clearWarning: true,
+      lowStockAlert: lowStockAlert,
+      clearLowStockAlert: lowStockAlert == null,
     );
   }
 

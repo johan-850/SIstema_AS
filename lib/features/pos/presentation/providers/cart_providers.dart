@@ -68,7 +68,7 @@ class CartNotifier extends StateNotifier<CartState> {
         unit: product.unit,
         quantity: qty,
         availableStock: product.stock,
-        isLowStock: product.isLowStock,
+        minStock: product.minStock,
       );
       state = state.copyWith(
         items: [...state.items, item],

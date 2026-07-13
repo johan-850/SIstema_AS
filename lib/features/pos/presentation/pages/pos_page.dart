@@ -12,6 +12,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/utils/stock_tier.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/product_thumbnail.dart';
 import '../../../../core/widgets/barcode_scanner_page.dart';
@@ -192,8 +193,12 @@ class _PosPageState extends ConsumerState<PosPage> {
                         separatorBuilder: (_, _) => const SizedBox(height: 10),
                         itemBuilder: (context, i) {
                           final p = catalogState.products[i];
+                          final inCart = cartState.items
+                              .where((item) => item.productId == p.id)
+                              .fold(0, (sum, item) => sum + item.quantity);
                           return _VentaProductTile(
                             product: p,
+                            quantityInCart: inCart,
                             priceFmt: _priceFmt,
                             onAdd: () => ref.read(cartProvider.notifier).addProduct(p),
                           );
@@ -418,20 +423,33 @@ class _CategoryChip extends StatelessWidget {
 
 class _VentaProductTile extends StatelessWidget {
   final Product product;
+  final int quantityInCart;
   final NumberFormat priceFmt;
   final VoidCallback onAdd;
 
-  const _VentaProductTile({required this.product, required this.priceFmt, required this.onAdd});
+  const _VentaProductTile({
+    required this.product,
+    required this.quantityInCart,
+    required this.priceFmt,
+    required this.onAdd,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final outOfStock = product.isOutOfStock;
+    // US-059: el stock "restante" descuenta lo que el cajero ya agregó al
+    // carrito, para que la tarjeta se vaya poniendo amarilla/roja a medida
+    // que se acerca (o llega) al mínimo mientras arma la venta — no hay que
+    // esperar a confirmar el cobro para verlo.
+    final remainingStock = product.stock - quantityInCart;
+    final outOfStock = remainingStock <= 0;
+    final tier = stockTierFor(remainingStock: remainingStock, minStock: product.minStock);
+
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppColors.surfaceCard,
+        color: tier.backgroundTint ?? AppColors.surfaceCard,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: tier.accentColor, width: tier == StockTier.normal ? 1 : 1.5),
       ),
       child: Row(
         children: [
@@ -446,12 +464,21 @@ class _VentaProductTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 2),
-                Text(
-                  outOfStock ? 'Agotado' : '${product.stock} ${product.unit} stock',
-                  style: TextStyle(
-                    color: outOfStock ? AppColors.error : AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
+                Row(
+                  children: [
+                    if (tier != StockTier.normal && !outOfStock) ...[
+                      Icon(Icons.warning_rounded, size: 12, color: tier.accentColor),
+                      const SizedBox(width: 3),
+                    ],
+                    Text(
+                      outOfStock ? 'Agotado' : '$remainingStock ${product.unit} stock',
+                      style: TextStyle(
+                        color: tier == StockTier.normal ? AppColors.textSecondary : tier.accentColor,
+                        fontWeight: tier == StockTier.normal ? FontWeight.normal : FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

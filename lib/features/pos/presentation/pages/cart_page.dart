@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/stock_tier.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/confirmation_dialog.dart';
 import '../../../../core/widgets/product_thumbnail.dart';
@@ -36,17 +37,7 @@ class CartPage extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: const Text('Carrito'),
-        actions: [
-          if (state.items.isNotEmpty)
-            IconButton(
-              tooltip: 'Cancelar venta',
-              icon: const Icon(Icons.delete_sweep_outlined),
-              onPressed: () => _confirmCancel(context, ref, notifier, state, registerId),
-            ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Carrito')),
       body: state.items.isEmpty
           ? const Center(
               child: Text('El carrito está vacío', style: TextStyle(color: AppColors.textSecondary)),
@@ -106,17 +97,38 @@ class CartPage extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const CheckoutPage()),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 48,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.error,
+                                side: const BorderSide(color: AppColors.error),
+                              ),
+                              onPressed: () => _confirmCancel(context, ref, notifier, state, registerId),
+                              icon: const Icon(Icons.delete_sweep_outlined),
+                              label: const Text('Cancelar'),
+                            ),
+                          ),
                         ),
-                        icon: const Icon(Icons.point_of_sale_rounded),
-                        label: const Text('Cobrar'),
-                      ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 2,
+                          child: SizedBox(
+                            height: 48,
+                            child: ElevatedButton.icon(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const CheckoutPage()),
+                              ),
+                              icon: const Icon(Icons.point_of_sale_rounded),
+                              label: const Text('Cobrar'),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -227,12 +239,17 @@ class _CartItemTileState extends State<_CartItemTile> {
 
   @override
   Widget build(BuildContext context) {
+    // US-059: se recalcula con cada cambio de cantidad — si el cajero sube
+    // la cantidad de este ítem, la tarjeta se va poniendo amarilla/roja en
+    // vivo a medida que se acerca (o llega) al stock mínimo del producto.
+    final tier = stockTierFor(remainingStock: widget.item.remainingStock, minStock: widget.item.minStock);
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surfaceCard,
+        color: tier.backgroundTint ?? AppColors.surfaceCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: tier.accentColor, width: tier == StockTier.normal ? 1 : 1.5),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -245,8 +262,8 @@ class _CartItemTileState extends State<_CartItemTile> {
               children: [
                 Row(
                   children: [
-                    if (widget.item.isLowStock) ...[
-                      const Icon(Icons.warning_amber_rounded, size: 14, color: AppColors.warning),
+                    if (tier != StockTier.normal) ...[
+                      Icon(Icons.warning_rounded, size: 14, color: tier.accentColor),
                       const SizedBox(width: 4),
                     ],
                     Expanded(
@@ -263,6 +280,15 @@ class _CartItemTileState extends State<_CartItemTile> {
                   '${widget.currencyFmt.format(widget.item.unitPrice)} c/u',
                   style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                 ),
+                if (tier != StockTier.normal) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    widget.item.remainingStock <= 0
+                        ? 'Quedarían 0 en stock'
+                        : 'Quedarían ${widget.item.remainingStock} en stock',
+                    style: TextStyle(color: tier.accentColor, fontWeight: FontWeight.bold, fontSize: 11),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Row(
                   children: [

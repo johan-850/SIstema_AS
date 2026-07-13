@@ -3,10 +3,12 @@
 // Providers de Riverpod para la Épica 3 — CRUD de Productos
 // ============================================================
 
+import 'dart:async';
 import 'dart:convert';
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/datasources/product_remote_datasource.dart';
 import '../../data/repositories/product_repository_impl.dart';
 import '../../domain/entities/product.dart';
@@ -56,6 +58,11 @@ final deleteProductImageUseCaseProvider = Provider(
   (ref) => DeleteProductImageUseCase(ref.read(productRepositoryProvider)),
 );
 
+// ── US-017: Filtro por alerta de stock ─────────────────────────
+
+/// Nivel de alerta de stock para filtrar el listado (US-017).
+enum StockAlertFilter { all, low, outOfStock }
+
 // ── US-014: Estado del listado de productos ───────────────────
 
 /// Estado que maneja la lista de productos, búsqueda y paginación.
@@ -69,6 +76,7 @@ class ProductListState {
   final String? searchQuery;
   final String? filterCategory;
   final bool showInactive;
+  final StockAlertFilter filterStockAlert;
 
   const ProductListState({
     this.products = const [],
@@ -78,13 +86,15 @@ class ProductListState {
     this.searchQuery,
     this.filterCategory,
     this.showInactive = false,
+    this.filterStockAlert = StockAlertFilter.all,
   });
 
   /// True cuando hay filtros o búsqueda activa
   bool get hasActiveFilters =>
       (searchQuery != null && searchQuery!.isNotEmpty) ||
       filterCategory != null ||
-      showInactive;
+      showInactive ||
+      filterStockAlert != StockAlertFilter.all;
 
   ProductListState copyWith({
     List<Product>? products,
@@ -94,6 +104,7 @@ class ProductListState {
     String? searchQuery,
     String? filterCategory,
     bool? showInactive,
+    StockAlertFilter? filterStockAlert,
     bool clearFailure = false,
     bool clearFilters = false,
   }) =>
@@ -108,17 +119,38 @@ class ProductListState {
             clearFilters ? null : (filterCategory ?? this.filterCategory),
         showInactive:
             clearFilters ? false : (showInactive ?? this.showInactive),
+        filterStockAlert: clearFilters
+            ? StockAlertFilter.all
+            : (filterStockAlert ?? this.filterStockAlert),
       );
 }
 
 class ProductListNotifier extends StateNotifier<ProductListState> {
   final GetProductsUseCase _getProducts;
+  StreamSubscription<List<Map<String, dynamic>>>? _realtimeSub;
 
-  ProductListNotifier(this._getProducts) : super(const ProductListState()) {
+  ProductListNotifier(this._getProducts, SupabaseClient client) : super(const ProductListState()) {
     load();
+    // Refresco en tiempo real cuando cambia la tabla products (ej. un
+    // ajuste de stock o una edición hecha desde otra sesión) — mismo
+    // criterio que InventoryListNotifier (EP-04) y PosCatalogNotifier.
+    _realtimeSub = client.from('products').stream(primaryKey: ['id']).listen((_) {
+      load();
+    });
+  }
+
+  @override
+  void dispose() {
+    _realtimeSub?.cancel();
+    super.dispose();
   }
 
   /// Carga (o recarga) la lista con los filtros actuales.
+  ///
+  /// El filtro de alerta de stock se aplica client-side sobre lo ya
+  /// traído: Supabase/PostgREST no compara columnas entre sí
+  /// (stock vs min_stock) en una query simple. A la escala de una
+  /// tienda pequeña esto es aceptable.
   Future<void> load({int page = 0}) async {
     state = state.copyWith(isLoading: true, currentPage: page, clearFailure: true);
 
@@ -132,7 +164,12 @@ class ProductListNotifier extends StateNotifier<ProductListState> {
     if (result.failure != null) {
       state = state.copyWith(isLoading: false, failure: result.failure);
     } else {
-      state = state.copyWith(isLoading: false, products: result.products);
+      final filtered = switch (state.filterStockAlert) {
+        StockAlertFilter.all => result.products,
+        StockAlertFilter.low => result.products.where((p) => p.isLowStock && !p.isOutOfStock).toList(),
+        StockAlertFilter.outOfStock => result.products.where((p) => p.isOutOfStock).toList(),
+      };
+      state = state.copyWith(isLoading: false, products: filtered);
     }
   }
 
@@ -154,6 +191,12 @@ class ProductListNotifier extends StateNotifier<ProductListState> {
     await load();
   }
 
+  /// US-017: Filtrar por alerta de stock (todos / bajo mínimo / agotado)
+  Future<void> filterByStockAlert(StockAlertFilter filter) async {
+    state = state.copyWith(filterStockAlert: filter);
+    await load();
+  }
+
   /// Limpiar todos los filtros
   Future<void> clearFilters() async {
     state = state.copyWith(clearFilters: true);
@@ -166,7 +209,7 @@ class ProductListNotifier extends StateNotifier<ProductListState> {
 
 final productListProvider =
     StateNotifierProvider<ProductListNotifier, ProductListState>(
-  (ref) => ProductListNotifier(ref.read(getProductsUseCaseProvider)),
+  (ref) => ProductListNotifier(ref.read(getProductsUseCaseProvider), ref.read(supabaseClientProvider)),
 );
 
 // ── US-013 / US-015: Estado del formulario de producto ────────

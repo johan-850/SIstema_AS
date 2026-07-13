@@ -22,6 +22,38 @@ abstract class AppConstants {
   // ── Storage buckets — EP-03 ───────────────────────────────
   static const String storageBucketProductImages = 'product-images';
 
+  // ── Tablas / RPC Supabase — EP-04 ─────────────────────────
+  static const String tableRestockRequests = 'restock_requests';
+  static const String rpcAdjustStock       = 'adjust_product_stock';
+
+  /// Dirección del movimiento de stock (US-021)
+  static const List<String> stockMovementTypes = ['entrada', 'salida'];
+
+  /// Motivos disponibles en el formulario de ajuste manual.
+  /// 'venta' no está aquí: queda reservado para cuando EP-05 (POS)
+  /// registre movimientos automáticos.
+  static const List<String> stockAdjustmentReasons = [
+    'recepcion',
+    'merma',
+    'devolucion',
+    'ajuste',
+  ];
+
+  // ── Tablas / RPC Supabase — EP-05 ─────────────────────────
+  static const String tableSales             = 'sales';
+  static const String tableSaleItems         = 'sale_items';
+  static const String rpcConfirmSale         = 'confirm_sale';
+  static const String tableSaleCancellations = 'sale_cancellations';
+  static const String tableLowStockAlerts    = 'low_stock_alerts';
+
+  /// Métodos de pago disponibles en el cobro (US-030)
+  static const List<String> paymentMethods = ['efectivo', 'transferencia', 'mixto'];
+
+  // ── QR de pago y comprobante de transferencia ──────────────
+  static const String tableStoreSettings           = 'store_settings';
+  static const String storageBucketStoreAssets     = 'store-assets';
+  static const String storageBucketReceiptPhotos   = 'receipt-photos';
+
   // ── Edge Functions ────────────────────────────────────────
   static const String fnCreateCashier        = 'create-cashier';
   static const String fnToggleCashierStatus  = 'toggle-cashier-status';

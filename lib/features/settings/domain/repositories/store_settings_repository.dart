@@ -1,0 +1,23 @@
+// ============================================================
+// lib/features/settings/domain/repositories/store_settings_repository.dart
+// Contrato del repositorio de configuración del negocio
+// ============================================================
+
+import 'dart:typed_data';
+
+import '../entities/store_settings.dart';
+import '../../../../core/errors/failures.dart';
+
+typedef StoreSettingsResult = ({StoreSettings? settings, Failure? failure});
+
+abstract class StoreSettingsRepository {
+  /// Lee la fila singleton de configuración del negocio.
+  Future<StoreSettingsResult> getSettings();
+
+  /// Sube la imagen del QR de pago y guarda su URL en la configuración.
+  /// Devuelve la configuración ya actualizada.
+  Future<StoreSettingsResult> updateQrImage(Uint8List bytes, String fileExt);
+
+  /// Quita el QR configurado (borra el archivo y limpia la URL guardada).
+  Future<StoreSettingsResult> removeQrImage(String currentUrl);
+}

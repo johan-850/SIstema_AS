@@ -74,7 +74,7 @@ class AdminDashboardPage extends ConsumerWidget {
                   _ModuleCard(icon: Icons.inventory_2_outlined, label: 'Productos', color: AppColors.secondary,
                       onTap: () => context.push('/admin/products')),
                   _ModuleCard(icon: Icons.bar_chart_rounded, label: 'Inventario', color: AppColors.warning,
-                      onTap: () {}),
+                      onTap: () => context.push('/admin/inventory')),
                   _ModuleCard(icon: Icons.receipt_long_rounded, label: 'Reportes', color: AppColors.info,
                       onTap: () {}),
                   _ModuleCard(icon: Icons.analytics_rounded, label: 'Estadísticas', color: AppColors.accent,

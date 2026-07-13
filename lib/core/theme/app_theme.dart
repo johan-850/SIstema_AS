@@ -35,6 +35,13 @@ abstract class AppColors {
   static const stockOk = Color(0xFF3FB950);
   static const stockWarning = Color(0xFFD29922);
   static const stockCritical = Color(0xFFF85149);
+
+  // ── Stock semáforo vívido (tarjetas de venta/carrito) ──────
+  // Colores más saturados/eléctricos que stockWarning/stockCritical,
+  // pensados para llamar la atención en las tarjetas del POS y el
+  // carrito mientras se agregan productos, no para texto/íconos chicos.
+  static const stockNearVivid = Color(0xFFFFD600);     // amarillo eléctrico
+  static const stockCriticalVivid = Color(0xFFFF1744);  // rojo eléctrico
 }
 
 abstract class AppTheme {

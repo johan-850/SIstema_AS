@@ -3,10 +3,12 @@
 // Providers de Riverpod para la Épica 3 — CRUD de Productos
 // ============================================================
 
+import 'dart:async';
 import 'dart:convert';
 import 'package:csv/csv.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/datasources/product_remote_datasource.dart';
 import '../../data/repositories/product_repository_impl.dart';
 import '../../domain/entities/product.dart';
@@ -125,9 +127,22 @@ class ProductListState {
 
 class ProductListNotifier extends StateNotifier<ProductListState> {
   final GetProductsUseCase _getProducts;
+  StreamSubscription<List<Map<String, dynamic>>>? _realtimeSub;
 
-  ProductListNotifier(this._getProducts) : super(const ProductListState()) {
+  ProductListNotifier(this._getProducts, SupabaseClient client) : super(const ProductListState()) {
     load();
+    // Refresco en tiempo real cuando cambia la tabla products (ej. un
+    // ajuste de stock o una edición hecha desde otra sesión) — mismo
+    // criterio que InventoryListNotifier (EP-04) y PosCatalogNotifier.
+    _realtimeSub = client.from('products').stream(primaryKey: ['id']).listen((_) {
+      load();
+    });
+  }
+
+  @override
+  void dispose() {
+    _realtimeSub?.cancel();
+    super.dispose();
   }
 
   /// Carga (o recarga) la lista con los filtros actuales.
@@ -194,7 +209,7 @@ class ProductListNotifier extends StateNotifier<ProductListState> {
 
 final productListProvider =
     StateNotifierProvider<ProductListNotifier, ProductListState>(
-  (ref) => ProductListNotifier(ref.read(getProductsUseCaseProvider)),
+  (ref) => ProductListNotifier(ref.read(getProductsUseCaseProvider), ref.read(supabaseClientProvider)),
 );
 
 // ── US-013 / US-015: Estado del formulario de producto ────────

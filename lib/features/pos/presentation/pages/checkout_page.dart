@@ -6,11 +6,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../cash_register/presentation/providers/cash_register_providers.dart';
+import '../../../settings/presentation/providers/store_settings_providers.dart';
 import '../../domain/entities/cart_item.dart';
 import '../providers/cart_providers.dart';
 import '../providers/checkout_provider.dart';
@@ -212,7 +214,9 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                       : 'Suma actual: ${_currencyFmt.format(mixedSum)} — faltan ${_currencyFmt.format(total - mixedSum)}',
                   style: TextStyle(color: mixedMatches ? AppColors.success : AppColors.warning, fontSize: 13),
                 ),
-              ] else
+                const SizedBox(height: 16),
+                const _TransferProofSection(),
+              ] else if (checkout.paymentMethod == 'transferencia') ...[
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 8),
                   child: Text(
@@ -220,6 +224,8 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                     style: TextStyle(color: AppColors.textSecondary),
                   ),
                 ),
+                const _TransferProofSection(),
+              ],
 
               const SizedBox(height: 32),
               SizedBox(
@@ -289,5 +295,194 @@ class _PaymentMethodButton extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// QR de pago del negocio + foto opcional del comprobante — se muestra
+/// en 'transferencia' y 'mixto'. El QR lo configura el AdminMaster desde
+/// Configuración; si todavía no lo subió, se avisa en vez de bloquear.
+class _TransferProofSection extends ConsumerWidget {
+  const _TransferProofSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settingsAsync = ref.watch(storeSettingsProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceCard,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            children: [
+              const Text('Escanea para pagar',
+                  style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14)),
+              const SizedBox(height: 12),
+              settingsAsync.when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
+                error: (_, _) => const _QrPlaceholder(),
+                data: (settings) => (settings?.qrImageUrl != null && settings!.qrImageUrl!.isNotEmpty)
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.network(settings.qrImageUrl!, width: 200, height: 200, fit: BoxFit.contain),
+                      )
+                    : const _QrPlaceholder(),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        const _ReceiptPhotoPicker(),
+      ],
+    );
+  }
+}
+
+class _QrPlaceholder extends StatelessWidget {
+  const _QrPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 200,
+      height: 200,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: const Text(
+        'El AdminMaster aún no configuró el QR de pago.',
+        textAlign: TextAlign.center,
+        style: TextStyle(color: AppColors.textDisabled, fontSize: 12),
+      ),
+    );
+  }
+}
+
+class _ReceiptPhotoPicker extends ConsumerWidget {
+  const _ReceiptPhotoPicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final checkout = ref.watch(checkoutProvider);
+    final notifier = ref.read(checkoutProvider.notifier);
+    final hasPhoto = checkout.receiptPhotoUrl != null;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Foto del comprobante (opcional)',
+              style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14)),
+          const SizedBox(height: 12),
+          if (checkout.isUploadingReceiptPhoto)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: CircularProgressIndicator(color: AppColors.primary),
+              ),
+            )
+          else if (hasPhoto) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.network(checkout.receiptPhotoUrl!, height: 160, width: double.infinity, fit: BoxFit.cover),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _pick(context, ref),
+                    icon: const Icon(Icons.camera_alt_rounded, size: 18),
+                    label: const Text('Retomar'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: 'Quitar foto',
+                  icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+                  onPressed: notifier.removeReceiptPhoto,
+                ),
+              ],
+            ),
+          ] else
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _pick(context, ref),
+                icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                label: const Text('Tomar foto del comprobante'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _pick(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_rounded, color: AppColors.primary),
+              title: const Text('Tomar foto', style: TextStyle(color: AppColors.textPrimary)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAndUpload(context, ref, ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
+              title: const Text('Elegir de galería', style: TextStyle(color: AppColors.textPrimary)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _pickAndUpload(context, ref, ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickAndUpload(BuildContext context, WidgetRef ref, ImageSource source) async {
+    final XFile? picked;
+    try {
+      picked = await ImagePicker().pickImage(source: source, maxWidth: 1024, imageQuality: 85);
+    } catch (_) {
+      if (context.mounted) AppSnackbar.error(context, 'No se pudo acceder a la cámara/galería.');
+      return;
+    }
+    if (picked == null) return;
+
+    final bytes = await picked.readAsBytes();
+    final ext = picked.name.contains('.') ? picked.name.split('.').last : 'jpg';
+    await ref.read(checkoutProvider.notifier).setReceiptPhoto(bytes, ext);
   }
 }

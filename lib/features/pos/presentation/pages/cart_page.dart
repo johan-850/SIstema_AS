@@ -12,8 +12,10 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/confirmation_dialog.dart';
 import '../../../../core/widgets/product_thumbnail.dart';
+import '../../../cash_register/presentation/providers/cash_register_providers.dart';
 import '../../domain/entities/cart_item.dart';
 import '../providers/cart_providers.dart';
+import '../providers/checkout_provider.dart' show logCancelledSaleUseCaseProvider;
 import 'checkout_page.dart';
 
 class CartPage extends ConsumerWidget {
@@ -24,6 +26,7 @@ class CartPage extends ConsumerWidget {
     final state = ref.watch(cartProvider);
     final notifier = ref.read(cartProvider.notifier);
     final currencyFmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+    final registerId = ref.watch(activeRegisterProvider).valueOrNull?.id;
 
     ref.listen<CartState>(cartProvider, (_, next) {
       if (next.warningMessage != null) {
@@ -38,9 +41,9 @@ class CartPage extends ConsumerWidget {
         actions: [
           if (state.items.isNotEmpty)
             IconButton(
-              tooltip: 'Vaciar carrito',
+              tooltip: 'Cancelar venta',
               icon: const Icon(Icons.delete_sweep_outlined),
-              onPressed: () => _confirmClear(context, notifier),
+              onPressed: () => _confirmCancel(context, ref, notifier, state, registerId),
             ),
         ],
       ),
@@ -133,14 +136,33 @@ class CartPage extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmClear(BuildContext context, CartNotifier notifier) {
+  /// US-032: "Cancelar venta" — nada se había descontado de stock
+  /// todavía (eso solo ocurre al confirmar el cobro), así que cancelar
+  /// es simplemente vaciar el carrito. Queda un registro de auditoría
+  /// del intento cancelado antes de limpiar el estado.
+  Future<void> _confirmCancel(
+    BuildContext context,
+    WidgetRef ref,
+    CartNotifier notifier,
+    CartState state,
+    String? registerId,
+  ) {
     return ConfirmationDialog.show(
       context,
-      title: 'Vaciar carrito',
-      message: '¿Seguro que quieres quitar todos los productos del carrito?',
-      confirmLabel: 'Vaciar',
+      title: 'Cancelar venta',
+      message: '¿Seguro que quieres cancelar esta venta y quitar todos los productos del carrito?',
+      confirmLabel: 'Cancelar venta',
       isDangerous: true,
-      onConfirm: notifier.clear,
+      onConfirm: () {
+        if (registerId != null) {
+          ref.read(logCancelledSaleUseCaseProvider)(
+            cashRegisterId: registerId,
+            itemsCount: state.totalItems,
+            totalAmount: state.totalAmount,
+          );
+        }
+        notifier.clear();
+      },
     );
   }
 }
@@ -221,11 +243,21 @@ class _CartItemTileState extends State<_CartItemTile> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.item.name,
-                    style: const TextStyle(
-                        color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
+                Row(
+                  children: [
+                    if (widget.item.isLowStock) ...[
+                      const Icon(Icons.warning_amber_rounded, size: 14, color: AppColors.warning),
+                      const SizedBox(width: 4),
+                    ],
+                    Expanded(
+                      child: Text(widget.item.name,
+                          style: const TextStyle(
+                              color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 2),
                 Text(
                   '${widget.currencyFmt.format(widget.item.unitPrice)} c/u',

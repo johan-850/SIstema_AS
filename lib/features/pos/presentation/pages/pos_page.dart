@@ -22,6 +22,7 @@ import '../../../products/domain/entities/product.dart';
 import '../../../products/presentation/providers/product_providers.dart'
     show getProductByBarcodeUseCaseProvider;
 import '../providers/cart_providers.dart';
+import '../providers/checkout_provider.dart' show logLowStockAlertUseCaseProvider;
 import '../providers/pos_catalog_provider.dart';
 
 class PosPage extends ConsumerStatefulWidget {
@@ -74,6 +75,19 @@ class _PosPageState extends ConsumerState<PosPage> {
     ref.listen<CartState>(cartProvider, (_, next) {
       if (next.warningMessage != null) {
         AppSnackbar.warning(context, next.warningMessage!);
+      }
+      // US-059: banner de stock bajo — no bloquea la venta, solo avisa.
+      final alert = next.lowStockAlert;
+      if (alert != null) {
+        AppSnackbar.warning(
+          context,
+          'Stock bajo: "${alert.productName}" solo tiene ${alert.stock} ${alert.stock == 1 ? 'unidad' : 'unidades'}.',
+        );
+        ref.read(logLowStockAlertUseCaseProvider)(
+          productId: alert.productId,
+          productName: alert.productName,
+          stock: alert.stock,
+        );
       }
     });
 

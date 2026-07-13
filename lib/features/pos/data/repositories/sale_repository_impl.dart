@@ -3,6 +3,8 @@
 // Implementación del repositorio — convierte excepciones a Failures
 // ============================================================
 
+import 'dart:typed_data';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../domain/entities/cart_item.dart';
@@ -34,6 +36,7 @@ class SaleRepositoryImpl implements SaleRepository {
     double? cashAmount,
     double? transferAmount,
     required List<CartItem> items,
+    String? receiptPhotoUrl,
   }) async {
     try {
       final sale = await _datasource.confirmSale(
@@ -42,10 +45,63 @@ class SaleRepositoryImpl implements SaleRepository {
         cashAmount: cashAmount,
         transferAmount: transferAmount,
         items: items,
+        receiptPhotoUrl: receiptPhotoUrl,
       );
       return (sale: sale, failure: null);
     } catch (e) {
       return (sale: null, failure: _mapException(e));
+    }
+  }
+
+  @override
+  Future<({String? url, Failure? failure})> uploadReceiptPhoto(
+    Uint8List bytes,
+    String fileExt,
+  ) async {
+    try {
+      final url = await _datasource.uploadReceiptPhoto(bytes, fileExt);
+      return (url: url, failure: null);
+    } catch (e) {
+      return (url: null, failure: _mapException(e));
+    }
+  }
+
+  @override
+  Future<void> deleteReceiptPhoto(String photoUrl) => _datasource.deleteReceiptPhoto(photoUrl);
+
+  @override
+  Future<Failure?> logCancelledSale({
+    required String cashRegisterId,
+    required int itemsCount,
+    required double totalAmount,
+  }) async {
+    try {
+      await _datasource.logCancelledSale(
+        cashRegisterId: cashRegisterId,
+        itemsCount: itemsCount,
+        totalAmount: totalAmount,
+      );
+      return null;
+    } catch (e) {
+      return _mapException(e);
+    }
+  }
+
+  @override
+  Future<Failure?> logLowStockAlert({
+    required String productId,
+    required String productName,
+    required int stock,
+  }) async {
+    try {
+      await _datasource.logLowStockAlert(
+        productId: productId,
+        productName: productName,
+        stock: stock,
+      );
+      return null;
+    } catch (e) {
+      return _mapException(e);
     }
   }
 }

@@ -3,6 +3,8 @@
 // Contrato del repositorio de ventas — Clean Architecture
 // ============================================================
 
+import 'dart:typed_data';
+
 import '../entities/sale.dart';
 import '../entities/cart_item.dart';
 import '../../../../core/errors/failures.dart';
@@ -19,5 +21,35 @@ abstract class SaleRepository {
     double? cashAmount,
     double? transferAmount,
     required List<CartItem> items,
+    String? receiptPhotoUrl,
+  });
+
+  /// Sube la foto del comprobante de transferencia y devuelve su URL
+  /// pública. Se sube antes de confirmar el cobro para incluir la URL
+  /// en el mismo INSERT atómico de la venta.
+  Future<({String? url, Failure? failure})> uploadReceiptPhoto(
+    Uint8List bytes,
+    String fileExt,
+  );
+
+  /// Borra una foto de comprobante previamente subida (best-effort,
+  /// ej. cuando el cajero retoma la foto antes de confirmar el cobro).
+  Future<void> deleteReceiptPhoto(String photoUrl);
+
+  /// US-032: deja constancia de que el cajero canceló/vació el
+  /// carrito antes de confirmar el cobro (fines de auditoría —
+  /// no hay stock que revertir, nada se había descontado todavía).
+  Future<Failure?> logCancelledSale({
+    required String cashRegisterId,
+    required int itemsCount,
+    required double totalAmount,
+  });
+
+  /// US-059: deja constancia de que se mostró la alerta de stock
+  /// bajo al agregar [productId] al carrito.
+  Future<Failure?> logLowStockAlert({
+    required String productId,
+    required String productName,
+    required int stock,
   });
 }

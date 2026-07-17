@@ -7,6 +7,10 @@ class AppUser extends Equatable {
   final String name;
   final String role; // 'adminmaster' | 'cajero'
   final bool isActive;
+
+  /// EP-06 (US-038): si es cajero, si el AdminMaster le habilitó el
+  /// módulo de gastos. Sin efecto para AdminMaster.
+  final bool expensesEnabled;
   final DateTime? lastLogin;
   final DateTime createdAt;
 
@@ -16,6 +20,7 @@ class AppUser extends Equatable {
     required this.name,
     required this.role,
     required this.isActive,
+    this.expensesEnabled = true,
     this.lastLogin,
     required this.createdAt,
   });
@@ -26,6 +31,7 @@ class AppUser extends Equatable {
   AppUser copyWith({
     String? name,
     bool? isActive,
+    bool? expensesEnabled,
     DateTime? lastLogin,
   }) =>
       AppUser(
@@ -34,6 +40,7 @@ class AppUser extends Equatable {
         name: name ?? this.name,
         role: role,
         isActive: isActive ?? this.isActive,
+        expensesEnabled: expensesEnabled ?? this.expensesEnabled,
         lastLogin: lastLogin ?? this.lastLogin,
         createdAt: createdAt,
       );

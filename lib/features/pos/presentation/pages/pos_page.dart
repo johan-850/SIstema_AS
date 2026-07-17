@@ -119,6 +119,13 @@ class _PosPageState extends ConsumerState<PosPage> {
             icon: const Icon(Icons.access_time_rounded),
             onPressed: () => _showShiftInfo(context, register),
           ),
+          // US-038: oculto si el AdminMaster deshabilitó el módulo para este cajero.
+          if (user?.expensesEnabled ?? true)
+            IconButton(
+              tooltip: 'Gastos',
+              icon: const Icon(Icons.payments_outlined),
+              onPressed: () => context.push('/pos/expenses'),
+            ),
           IconButton(
             tooltip: 'Configuración',
             icon: const Icon(Icons.settings_outlined),

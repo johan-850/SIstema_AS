@@ -33,6 +33,10 @@ final removeQrImageUseCaseProvider = Provider(
   (ref) => RemoveQrImageUseCase(ref.read(storeSettingsRepositoryProvider)),
 );
 
+final updateExpenseSettingsUseCaseProvider = Provider(
+  (ref) => UpdateExpenseSettingsUseCase(ref.read(storeSettingsRepositoryProvider)),
+);
+
 // ── Lectura ─────────────────────────────────────────────────────
 
 /// Configuración del negocio (hoy: solo el QR de pago). Se relee con

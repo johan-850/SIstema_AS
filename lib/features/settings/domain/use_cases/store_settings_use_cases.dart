@@ -29,3 +29,15 @@ class RemoveQrImageUseCase {
 
   Future<StoreSettingsResult> call(String currentUrl) => _repository.removeQrImage(currentUrl);
 }
+
+/// EP-06: guarda el límite de gasto y la ventana de edición.
+class UpdateExpenseSettingsUseCase {
+  final StoreSettingsRepository _repository;
+  const UpdateExpenseSettingsUseCase(this._repository);
+
+  Future<StoreSettingsResult> call({double? maxExpenseAmount, required int expenseEditWindowMinutes}) =>
+      _repository.updateExpenseSettings(
+        maxExpenseAmount: maxExpenseAmount,
+        expenseEditWindowMinutes: expenseEditWindowMinutes,
+      );
+}

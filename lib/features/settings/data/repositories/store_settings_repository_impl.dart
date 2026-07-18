@@ -56,4 +56,20 @@ class StoreSettingsRepositoryImpl implements StoreSettingsRepository {
       return (settings: null, failure: _mapException(e));
     }
   }
+
+  @override
+  Future<StoreSettingsResult> updateExpenseSettings({
+    double? maxExpenseAmount,
+    required int expenseEditWindowMinutes,
+  }) async {
+    try {
+      final settings = await _datasource.updateExpenseSettings(
+        maxExpenseAmount: maxExpenseAmount,
+        expenseEditWindowMinutes: expenseEditWindowMinutes,
+      );
+      return (settings: settings, failure: null);
+    } catch (e) {
+      return (settings: null, failure: _mapException(e));
+    }
+  }
 }

@@ -7,6 +7,7 @@ class CashierModel extends Cashier {
     required super.email,
     required super.name,
     required super.isActive,
+    super.expensesEnabled,
     super.lastLogin,
     required super.createdAt,
     super.createdBy,
@@ -17,6 +18,7 @@ class CashierModel extends Cashier {
         email: map['email'] as String,
         name: map['name'] as String? ?? '',
         isActive: map['is_active'] as bool? ?? true,
+        expensesEnabled: map['expenses_enabled'] as bool? ?? true,
         lastLogin: map['last_login'] != null
             ? DateTime.parse(map['last_login'] as String).toLocal()
             : null,

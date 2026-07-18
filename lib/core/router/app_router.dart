@@ -20,6 +20,9 @@ import '../../features/users/presentation/pages/users_list_page.dart';
 import '../../features/users/presentation/pages/create_cashier_page.dart';
 import '../../features/users/presentation/pages/cashier_detail_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
+import '../../features/expenses/presentation/pages/shift_expenses_page.dart';
+import '../../features/expenses/presentation/pages/expense_categories_admin_page.dart';
+import '../../features/expenses/presentation/pages/expenses_report_admin_page.dart';
 
 // ── Rutas nombradas ─────────────────────────────────────────
 abstract class AppRoutes {
@@ -39,6 +42,9 @@ abstract class AppRoutes {
   static const settings             = '/settings';
   static const reports              = '/admin/reports';
   static const analytics            = '/admin/analytics';
+  static const posExpenses          = '/pos/expenses';           // US-035
+  static const expensesReport       = '/admin/expenses';         // US-037
+  static const expenseCategories    = '/admin/expenses/categories'; // US-036
 }
 
 
@@ -166,6 +172,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.inventoryRestock,
         name: 'inventory-restock',
         builder: (_, _) => const RestockListPage(),
+      ),
+      // EP-06: Gastos de Caja
+      GoRoute(
+        path: AppRoutes.posExpenses,
+        name: 'pos-expenses',
+        builder: (_, _) => const ShiftExpensesPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.expensesReport,
+        name: 'expenses-report',
+        builder: (_, _) => const ExpensesReportAdminPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.expenseCategories,
+        name: 'expense-categories',
+        builder: (_, _) => const ExpenseCategoriesAdminPage(),
       ),
     ],
 

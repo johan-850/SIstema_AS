@@ -20,4 +20,11 @@ abstract class StoreSettingsRepository {
 
   /// Quita el QR configurado (borra el archivo y limpia la URL guardada).
   Future<StoreSettingsResult> removeQrImage(String currentUrl);
+
+  /// EP-06: guarda el monto máximo de gasto sugerido y la ventana de
+  /// edición de gastos recién registrados.
+  Future<StoreSettingsResult> updateExpenseSettings({
+    double? maxExpenseAmount,
+    required int expenseEditWindowMinutes,
+  });
 }

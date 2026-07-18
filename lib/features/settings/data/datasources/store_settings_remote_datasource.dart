@@ -15,8 +15,11 @@ class StoreSettingsRemoteDatasource {
   final SupabaseClient _client;
   const StoreSettingsRemoteDatasource(this._client);
 
-  StoreSettings _fromJson(Map<String, dynamic> json) =>
-      StoreSettings(qrImageUrl: json['qr_image_url'] as String?);
+  StoreSettings _fromJson(Map<String, dynamic> json) => StoreSettings(
+        qrImageUrl: json['qr_image_url'] as String?,
+        maxExpenseAmount: (json['max_expense_amount'] as num?)?.toDouble(),
+        expenseEditWindowMinutes: (json['expense_edit_window_minutes'] as num?)?.toInt() ?? 10,
+      );
 
   Future<StoreSettings> getSettings() async {
     final result = await _client
@@ -31,6 +34,24 @@ class StoreSettingsRemoteDatasource {
     final result = await _client
         .from(AppConstants.tableStoreSettings)
         .update({'qr_image_url': url, 'updated_at': DateTime.now().toIso8601String()})
+        .eq('id', 1)
+        .select()
+        .single();
+    return _fromJson(result);
+  }
+
+  /// EP-06: configuración del módulo de gastos (US-034/US-035).
+  Future<StoreSettings> updateExpenseSettings({
+    double? maxExpenseAmount,
+    required int expenseEditWindowMinutes,
+  }) async {
+    final result = await _client
+        .from(AppConstants.tableStoreSettings)
+        .update({
+          'max_expense_amount': maxExpenseAmount,
+          'expense_edit_window_minutes': expenseEditWindowMinutes,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
         .eq('id', 1)
         .select()
         .single();

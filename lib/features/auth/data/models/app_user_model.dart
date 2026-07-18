@@ -8,6 +8,7 @@ class AppUserModel extends AppUser {
     required super.name,
     required super.role,
     required super.isActive,
+    super.expensesEnabled,
     super.lastLogin,
     required super.createdAt,
   });
@@ -19,6 +20,7 @@ class AppUserModel extends AppUser {
       name: map['name'] as String? ?? '',
       role: map['role'] as String? ?? 'cajero',
       isActive: map['is_active'] as bool? ?? true,
+      expensesEnabled: map['expenses_enabled'] as bool? ?? true,
       lastLogin: map['last_login'] != null
           ? DateTime.parse(map['last_login'] as String)
           : null,
@@ -32,6 +34,7 @@ class AppUserModel extends AppUser {
         'name': name,
         'role': role,
         'is_active': isActive,
+        'expenses_enabled': expensesEnabled,
         'last_login': lastLogin?.toIso8601String(),
         'created_at': createdAt.toIso8601String(),
       };

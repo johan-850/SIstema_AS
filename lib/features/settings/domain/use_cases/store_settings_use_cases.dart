@@ -41,3 +41,12 @@ class UpdateExpenseSettingsUseCase {
         expenseEditWindowMinutes: expenseEditWindowMinutes,
       );
 }
+
+/// EP-07 (US-041): guarda el umbral de diferencia de caja que exige comentario.
+class UpdateCashDiffCommentThresholdUseCase {
+  final StoreSettingsRepository _repository;
+  const UpdateCashDiffCommentThresholdUseCase(this._repository);
+
+  Future<StoreSettingsResult> call(double threshold) =>
+      _repository.updateCashDiffCommentThreshold(threshold);
+}

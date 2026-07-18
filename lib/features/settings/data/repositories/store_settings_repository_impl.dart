@@ -72,4 +72,14 @@ class StoreSettingsRepositoryImpl implements StoreSettingsRepository {
       return (settings: null, failure: _mapException(e));
     }
   }
+
+  @override
+  Future<StoreSettingsResult> updateCashDiffCommentThreshold(double threshold) async {
+    try {
+      final settings = await _datasource.updateCashDiffCommentThreshold(threshold);
+      return (settings: settings, failure: null);
+    } catch (e) {
+      return (settings: null, failure: _mapException(e));
+    }
+  }
 }

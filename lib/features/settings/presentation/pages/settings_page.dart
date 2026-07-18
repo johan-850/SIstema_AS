@@ -78,6 +78,8 @@ class SettingsPage extends ConsumerWidget {
             const _QrSettingsCard(),
             const SizedBox(height: 16),
             const _ExpenseSettingsCard(),
+            const SizedBox(height: 16),
+            const _CashClosingSettingsCard(),
           ],
 
           const SizedBox(height: 24),
@@ -439,6 +441,122 @@ class _ExpenseSettingsCardState extends ConsumerState<_ExpenseSettingsCard> {
       maxExpenseAmount: maxAmount,
       expenseEditWindowMinutes: window,
     );
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+
+    if (result.failure != null) {
+      AppSnackbar.error(context, result.failure!.message);
+      return;
+    }
+    ref.invalidate(storeSettingsProvider);
+    AppSnackbar.success(context, 'Configuración guardada');
+  }
+}
+
+/// EP-07 (US-041): umbral de diferencia de caja que exige comentario
+/// obligatorio al cerrar turno.
+class _CashClosingSettingsCard extends ConsumerStatefulWidget {
+  const _CashClosingSettingsCard();
+
+  @override
+  ConsumerState<_CashClosingSettingsCard> createState() => _CashClosingSettingsCardState();
+}
+
+class _CashClosingSettingsCardState extends ConsumerState<_CashClosingSettingsCard> {
+  final _thresholdCtrl = TextEditingController();
+  bool _isSaving = false;
+  bool _initialized = false;
+
+  @override
+  void dispose() {
+    _thresholdCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settingsAsync = ref.watch(storeSettingsProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.lock_clock_outlined, color: AppColors.primary, size: 20),
+              SizedBox(width: 8),
+              Text('Cierre de caja',
+                  style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 15)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Diferencia de caja (en pesos) a partir de la cual el cajero debe justificar el cierre con un comentario.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          ),
+          const SizedBox(height: 14),
+          settingsAsync.when(
+            loading: () => const Center(
+              child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(color: AppColors.primary)),
+            ),
+            error: (_, _) => const Text('No se pudo cargar la configuración.',
+                style: TextStyle(color: AppColors.error, fontSize: 13)),
+            data: (settings) {
+              if (!_initialized) {
+                _thresholdCtrl.text = (settings?.cashDiffCommentThreshold ?? 5000).toStringAsFixed(0);
+                _initialized = true;
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: _thresholdCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    style: const TextStyle(color: AppColors.textPrimary),
+                    decoration: const InputDecoration(
+                      labelText: 'Umbral de diferencia',
+                      prefixIcon: Icon(Icons.attach_money_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isSaving ? null : _save,
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                            )
+                          : const Text('Guardar'),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    final threshold = double.tryParse(_thresholdCtrl.text);
+    if (threshold == null || threshold < 0) {
+      AppSnackbar.error(context, 'Ingresa un umbral válido.');
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    final result = await ref.read(updateCashDiffCommentThresholdUseCaseProvider)(threshold);
     if (!mounted) return;
     setState(() => _isSaving = false);
 

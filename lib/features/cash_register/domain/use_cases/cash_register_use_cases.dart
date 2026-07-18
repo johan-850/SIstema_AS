@@ -75,3 +75,42 @@ class GetRegisterHistoryUseCase {
         pageSize: pageSize,
       );
 }
+
+// ── US-039: Iniciar cierre de caja ────────────────────────────
+
+class StartRegisterClosingUseCase {
+  final CashRegisterRepository _repo;
+  const StartRegisterClosingUseCase(this._repo);
+
+  Future<CashRegisterResult> call(String registerId) => _repo.startClosing(registerId);
+}
+
+// ── US-040/041/042: Confirmar cierre de caja ──────────────────
+
+class CloseRegisterUseCase {
+  final CashRegisterRepository _repo;
+  const CloseRegisterUseCase(this._repo);
+
+  Future<CashRegisterResult> call({
+    required String registerId,
+    required Map<String, int> closingBreakdown,
+    required double closingAmount,
+    String? closingNotes,
+  }) =>
+      _repo.closeRegister(
+        registerId: registerId,
+        closingBreakdown: closingBreakdown,
+        closingAmount: closingAmount,
+        closingNotes: closingNotes,
+      );
+}
+
+// ── US-039: Resumen previo antes de iniciar el cierre ─────────
+
+class GetClosingPreviewUseCase {
+  final CashRegisterRepository _repo;
+  const GetClosingPreviewUseCase(this._repo);
+
+  Future<ClosingPreviewResult> call({required String registerId, required double openingAmount}) =>
+      _repo.getClosingPreview(registerId: registerId, openingAmount: openingAmount);
+}

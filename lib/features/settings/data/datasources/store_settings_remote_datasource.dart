@@ -19,6 +19,8 @@ class StoreSettingsRemoteDatasource {
         qrImageUrl: json['qr_image_url'] as String?,
         maxExpenseAmount: (json['max_expense_amount'] as num?)?.toDouble(),
         expenseEditWindowMinutes: (json['expense_edit_window_minutes'] as num?)?.toInt() ?? 10,
+        cashDiffCommentThreshold:
+            (json['cash_diff_comment_threshold'] as num?)?.toDouble() ?? 5000,
       );
 
   Future<StoreSettings> getSettings() async {
@@ -50,6 +52,20 @@ class StoreSettingsRemoteDatasource {
         .update({
           'max_expense_amount': maxExpenseAmount,
           'expense_edit_window_minutes': expenseEditWindowMinutes,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', 1)
+        .select()
+        .single();
+    return _fromJson(result);
+  }
+
+  /// EP-07: umbral de diferencia de caja que exige comentario (US-041).
+  Future<StoreSettings> updateCashDiffCommentThreshold(double threshold) async {
+    final result = await _client
+        .from(AppConstants.tableStoreSettings)
+        .update({
+          'cash_diff_comment_threshold': threshold,
           'updated_at': DateTime.now().toIso8601String(),
         })
         .eq('id', 1)

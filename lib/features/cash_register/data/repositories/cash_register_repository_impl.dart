@@ -75,4 +75,50 @@ class CashRegisterRepositoryImpl implements CashRegisterRepository {
       return (registers: <CashRegister>[], failure: _mapException(e));
     }
   }
+
+  @override
+  Future<CashRegisterResult> startClosing(String registerId) async {
+    try {
+      final register = await _datasource.startClosing(registerId);
+      return (register: register, failure: null);
+    } catch (e) {
+      return (register: null, failure: _mapException(e));
+    }
+  }
+
+  @override
+  Future<CashRegisterResult> closeRegister({
+    required String registerId,
+    required Map<String, int> closingBreakdown,
+    required double closingAmount,
+    String? closingNotes,
+  }) async {
+    try {
+      final register = await _datasource.closeRegister(
+        registerId: registerId,
+        closingBreakdown: closingBreakdown,
+        closingAmount: closingAmount,
+        closingNotes: closingNotes,
+      );
+      return (register: register, failure: null);
+    } catch (e) {
+      return (register: null, failure: _mapException(e));
+    }
+  }
+
+  @override
+  Future<ClosingPreviewResult> getClosingPreview({
+    required String registerId,
+    required double openingAmount,
+  }) async {
+    try {
+      final preview = await _datasource.getClosingPreview(
+        registerId: registerId,
+        openingAmount: openingAmount,
+      );
+      return (preview: preview, failure: null);
+    } catch (e) {
+      return (preview: null, failure: _mapException(e));
+    }
+  }
 }

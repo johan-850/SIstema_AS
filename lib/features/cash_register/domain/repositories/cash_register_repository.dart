@@ -12,6 +12,15 @@ typedef CashRegisterResult = ({CashRegister? register, Failure? failure});
 typedef CashRegisterListResult = ({List<CashRegister> registers, Failure? failure});
 typedef BoolResult = ({bool value, Failure? failure});
 
+/// US-039: resumen previo de solo lectura antes de iniciar el cierre.
+typedef ClosingPreview = ({
+  double salesTotal,
+  double expensesTotal,
+  double expectedCash,
+  int transactionCount,
+});
+typedef ClosingPreviewResult = ({ClosingPreview? preview, Failure? failure});
+
 // ── Interfaz ─────────────────────────────────────────────────
 
 abstract interface class CashRegisterRepository {
@@ -37,5 +46,27 @@ abstract interface class CashRegisterRepository {
     DateTime? to,
     int page = 0,
     int pageSize = 20,
+  });
+
+  /// US-039: inicia el cierre — la caja pasa a 'closing' y deja de
+  /// aceptar nuevas ventas/gastos.
+  Future<CashRegisterResult> startClosing(String registerId);
+
+  /// US-040/041/042: confirma el cierre de forma atómica. El cálculo
+  /// de efectivo esperado/diferencia lo hace el servidor, nunca el
+  /// cliente.
+  Future<CashRegisterResult> closeRegister({
+    required String registerId,
+    required Map<String, int> closingBreakdown,
+    required double closingAmount,
+    String? closingNotes,
+  });
+
+  /// US-039: resumen previo de solo lectura (ventas, gastos, efectivo
+  /// esperado) para mostrar antes de que el cajero confirme iniciar
+  /// el cierre.
+  Future<ClosingPreviewResult> getClosingPreview({
+    required String registerId,
+    required double openingAmount,
   });
 }

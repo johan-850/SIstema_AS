@@ -37,6 +37,10 @@ final updateExpenseSettingsUseCaseProvider = Provider(
   (ref) => UpdateExpenseSettingsUseCase(ref.read(storeSettingsRepositoryProvider)),
 );
 
+final updateCashDiffCommentThresholdUseCaseProvider = Provider(
+  (ref) => UpdateCashDiffCommentThresholdUseCase(ref.read(storeSettingsRepositoryProvider)),
+);
+
 // ── Lectura ─────────────────────────────────────────────────────
 
 /// Configuración del negocio (hoy: solo el QR de pago). Se relee con

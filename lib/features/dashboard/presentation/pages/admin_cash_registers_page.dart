@@ -192,6 +192,7 @@ class _RegisterCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final local = register.openingTime.toLocal();
     final isOpen = register.isOpen;
+    final isClosing = register.isClosing;
 
     return InkWell(
       onTap: onTap,
@@ -204,7 +205,9 @@ class _RegisterCard extends StatelessWidget {
           border: Border.all(
             color: isOpen
                 ? AppColors.primary.withValues(alpha: 0.4)
-                : AppColors.border,
+                : isClosing
+                    ? AppColors.stockNearVivid.withValues(alpha: 0.5)
+                    : AppColors.border,
           ),
         ),
         child: Row(
@@ -259,19 +262,25 @@ class _RegisterCard extends StatelessWidget {
               ),
             ),
 
-            // ── Badge estado ──────────────────────────────────
+            // ── Badge estado (Abierta / Cerrando / Cerrada) ────
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: isOpen
                     ? AppColors.success.withValues(alpha: 0.15)
-                    : AppColors.surfaceElevated,
+                    : isClosing
+                        ? AppColors.stockNearVivid.withValues(alpha: 0.15)
+                        : AppColors.surfaceElevated,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                isOpen ? 'Abierta' : 'Cerrada',
+                isOpen ? 'Abierta' : (isClosing ? 'Cerrando' : 'Cerrada'),
                 style: TextStyle(
-                  color: isOpen ? AppColors.success : AppColors.textSecondary,
+                  color: isOpen
+                      ? AppColors.success
+                      : isClosing
+                          ? AppColors.stockNearVivid
+                          : AppColors.textSecondary,
                   fontWeight: FontWeight.w600,
                   fontSize: 11,
                 ),
@@ -414,7 +423,102 @@ class _RegisterDetailSheet extends StatelessWidget {
             ),
           ),
         ],
+
+        // ── Cuadre de cierre (US-042) ────────────────────────
+        if (register.isClosed && register.closingSummary != null) ...[
+          const SizedBox(height: 20),
+          const Divider(color: AppColors.border),
+          const SizedBox(height: 12),
+          const _SheetSectionLabel('Cuadre de cierre'),
+          const SizedBox(height: 8),
+          _CuadreRow(label: 'Ventas efectivo', value: register.closingSummary!.salesEfectivo, currencyFmt: currencyFmt),
+          _CuadreRow(label: 'Ventas mixto (efectivo)', value: register.closingSummary!.salesMixtoEfectivo, currencyFmt: currencyFmt),
+          _CuadreRow(label: 'Ventas transferencia', value: register.closingSummary!.salesTransferencia, currencyFmt: currencyFmt),
+          _CuadreRow(label: 'Total ventas', value: register.closingSummary!.salesTotal, currencyFmt: currencyFmt, emphasize: true),
+          _CuadreRow(label: 'Transacciones', value: register.closingSummary!.transactionCount.toDouble(), currencyFmt: currencyFmt, isCount: true),
+          _CuadreRow(label: 'Gastos', value: register.closingSummary!.totalExpenses, currencyFmt: currencyFmt),
+          const SizedBox(height: 8),
+          _CuadreRow(label: 'Efectivo esperado', value: register.closingSummary!.expectedCash, currencyFmt: currencyFmt, emphasize: true),
+          _CuadreRow(label: 'Efectivo contado', value: register.closingSummary!.countedCash, currencyFmt: currencyFmt, emphasize: true),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Diferencia',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 14, fontWeight: FontWeight.w700)),
+                Text(
+                  '\$${currencyFmt.format(register.closingSummary!.difference)}',
+                  style: TextStyle(
+                    color: register.closingSummary!.difference == 0
+                        ? AppColors.success
+                        : (register.closingSummary!.difference.abs() <= 5000
+                            ? AppColors.stockNearVivid
+                            : AppColors.stockCriticalVivid),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (register.closingNotes != null && register.closingNotes!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceElevated,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                register.closingNotes!,
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, height: 1.5),
+              ),
+            ),
+          ],
+        ],
       ],
+    );
+  }
+}
+
+class _CuadreRow extends StatelessWidget {
+  final String label;
+  final double value;
+  final NumberFormat currencyFmt;
+  final bool emphasize;
+  final bool isCount;
+
+  const _CuadreRow({
+    required this.label,
+    required this.value,
+    required this.currencyFmt,
+    this.emphasize = false,
+    this.isCount = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: emphasize ? FontWeight.w600 : FontWeight.normal)),
+          Text(
+            isCount ? value.toInt().toString() : '\$${currencyFmt.format(value)}',
+            style: TextStyle(
+              color: emphasize ? AppColors.textPrimary : AppColors.textSecondary,
+              fontSize: emphasize ? 14 : 13,
+              fontWeight: emphasize ? FontWeight.w700 : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -27,4 +27,7 @@ abstract class StoreSettingsRepository {
     double? maxExpenseAmount,
     required int expenseEditWindowMinutes,
   });
+
+  /// EP-07 (US-041): umbral de diferencia de caja que exige comentario.
+  Future<StoreSettingsResult> updateCashDiffCommentThreshold(double threshold);
 }

@@ -18,6 +18,7 @@ import '../../../../core/widgets/product_thumbnail.dart';
 import '../../../../core/widgets/barcode_scanner_page.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../cash_register/domain/entities/cash_register.dart';
+import '../../../cash_register/presentation/pages/cash_register_closing_page.dart';
 import '../../../cash_register/presentation/providers/cash_register_providers.dart';
 import '../../../products/domain/entities/product.dart';
 import '../../../products/presentation/providers/product_providers.dart'
@@ -253,9 +254,35 @@ class _PosPageState extends ConsumerState<PosPage> {
               const SizedBox(height: 8),
               _ShiftInfoRow(label: 'Notas', value: register.notes!),
             ],
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _goToClosing(context, register);
+                },
+                icon: const Icon(Icons.lock_clock_outlined),
+                label: const Text('Cerrar caja'),
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  /// US-039: abre el wizard de cierre — igual patrón de Navigator.push
+  /// (no go_router) que BarcodeScannerPage/CheckoutPage, porque el
+  /// register no es serializable a una ruta con nombre.
+  void _goToClosing(BuildContext context, CashRegister register) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => CashRegisterClosingPage(register: register)),
     );
   }
 

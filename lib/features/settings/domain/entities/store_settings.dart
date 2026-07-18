@@ -16,14 +16,20 @@ class StoreSettings extends Equatable {
   /// puede editarse (US-035).
   final int expenseEditWindowMinutes;
 
+  /// EP-07 (US-041): diferencia de caja (en pesos) a partir de la cual
+  /// el cajero debe justificar el cierre con un comentario obligatorio.
+  final double cashDiffCommentThreshold;
+
   const StoreSettings({
     this.qrImageUrl,
     this.maxExpenseAmount,
     this.expenseEditWindowMinutes = 10,
+    this.cashDiffCommentThreshold = 5000,
   });
 
   bool get hasQrImage => qrImageUrl != null && qrImageUrl!.isNotEmpty;
 
   @override
-  List<Object?> get props => [qrImageUrl, maxExpenseAmount, expenseEditWindowMinutes];
+  List<Object?> get props =>
+      [qrImageUrl, maxExpenseAmount, expenseEditWindowMinutes, cashDiffCommentThreshold];
 }

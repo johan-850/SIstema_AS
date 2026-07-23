@@ -9,8 +9,10 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/widgets/filter_dropdown.dart';
 import '../../../cash_register/domain/entities/cash_register.dart';
 import '../../../cash_register/presentation/providers/cash_register_providers.dart';
+import '../../../users/presentation/providers/users_providers.dart';
 
 class AdminCashRegistersPage extends ConsumerStatefulWidget {
   const AdminCashRegistersPage({super.key});
@@ -76,6 +78,8 @@ class _AdminCashRegistersPageState
       BuildContext context, RegisterHistoryNotifier notifier) {
     DateTime? from;
     DateTime? to;
+    String? cashierId;
+    final cashiers = ref.read(cashierListProvider).cashiers;
 
     showModalBottomSheet(
       context: context,
@@ -98,6 +102,18 @@ class _AdminCashRegistersPageState
                     color: AppColors.textPrimary),
               ),
               const SizedBox(height: 20),
+
+              // Cajero (US-045)
+              FilterDropdown<String?>(
+                label: 'Cajero',
+                value: cashierId,
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Todos')),
+                  ...cashiers.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
+                ],
+                onChanged: (v) => setModal(() => cashierId = v),
+              ),
+              const SizedBox(height: 12),
 
               // Fecha desde
               _DatePickerTile(
@@ -131,7 +147,7 @@ class _AdminCashRegistersPageState
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(ctx);
-                        notifier.applyFilters(from: from, to: to);
+                        notifier.applyFilters(from: from, to: to, cashierId: cashierId);
                       },
                       child: const Text('Aplicar'),
                     ),
@@ -286,6 +302,27 @@ class _RegisterCard extends StatelessWidget {
                 ),
               ),
             ),
+            // US-045: punto ok/alerta según la diferencia del cuadre.
+            if (register.isClosed && register.closingSummary != null) ...[
+              const SizedBox(width: 8),
+              Tooltip(
+                message: register.closingSummary!.difference == 0
+                    ? 'Cuadre exacto'
+                    : 'Diferencia: ${NumberFormat('#,###', 'es_CO').format(register.closingSummary!.difference.abs())}',
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: register.closingSummary!.difference == 0
+                        ? AppColors.success
+                        : (register.closingSummary!.difference.abs() <= 5000
+                            ? AppColors.stockNearVivid
+                            : AppColors.stockCriticalVivid),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(width: 6),
             const Icon(Icons.chevron_right_rounded,
                 color: AppColors.textDisabled, size: 20),

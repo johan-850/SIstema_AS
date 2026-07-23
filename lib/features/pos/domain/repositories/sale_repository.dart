@@ -6,10 +6,31 @@
 import 'dart:typed_data';
 
 import '../entities/sale.dart';
+import '../entities/sale_item.dart';
 import '../entities/cart_item.dart';
 import '../../../../core/errors/failures.dart';
 
 typedef SaleResult = ({Sale? sale, Failure? failure});
+
+// ── EP-08: historial y reportes (AdminMaster) ──────────────────
+
+typedef SalesHistoryResult = ({List<Sale> sales, Failure? failure});
+typedef SaleDetailResult = ({Sale? sale, List<SaleItem> items, Failure? failure});
+
+/// US-048: resumen ejecutivo para las tarjetas KPI del dashboard.
+typedef SalesKpis = ({
+  double todayTotal,
+  int todayCount,
+  double weekTotal,
+  int weekCount,
+  double weekPrevTotal,
+  double monthTotal,
+  int monthCount,
+  double monthPrevTotal,
+  double avgTicket,
+  Map<String, int> paymentMethodCounts,
+});
+typedef SalesKpisResult = ({SalesKpis? kpis, Failure? failure});
 
 abstract class SaleRepository {
   /// US-030/US-031/US-032: confirma el cobro de una venta de forma
@@ -52,4 +73,25 @@ abstract class SaleRepository {
     required String productName,
     required int stock,
   });
+
+  /// US-044: historial paginado con filtros — [searchId] es una
+  /// búsqueda exacta por ID de venta (UUID completo), no parcial.
+  Future<SalesHistoryResult> getSalesHistory({
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    String? cashierId,
+    String? paymentMethod,
+    double? minAmount,
+    double? maxAmount,
+    String? searchId,
+    int page = 0,
+    int pageSize = 20,
+  });
+
+  /// US-047: la venta + sus ítems, con [SaleItem.isProductArchived]
+  /// ya resuelto contra el estado actual de cada producto.
+  Future<SaleDetailResult> getSaleDetail(String saleId);
+
+  /// US-048: KPIs para el dashboard del AdminMaster.
+  Future<SalesKpisResult> getSalesKpis();
 }

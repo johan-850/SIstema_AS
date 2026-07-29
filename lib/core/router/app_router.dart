@@ -25,6 +25,7 @@ import '../../features/expenses/presentation/pages/expense_categories_admin_page
 import '../../features/expenses/presentation/pages/expenses_report_admin_page.dart';
 import '../../features/dashboard/presentation/pages/sales_history_page.dart';
 import '../../features/dashboard/presentation/pages/sale_detail_page.dart';
+import '../../features/dashboard/presentation/pages/sales_statistics_page.dart';
 
 // ── Rutas nombradas ─────────────────────────────────────────
 abstract class AppRoutes {
@@ -203,6 +204,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.saleDetail,
         name: 'sale-detail',
         builder: (_, state) => SaleDetailPage(saleId: state.pathParameters['id']!),
+      ),
+      // EP-09 (S-10): Estadísticas y tendencias de ventas
+      GoRoute(
+        path: AppRoutes.analytics,
+        name: 'sales-statistics',
+        builder: (_, _) => const SalesStatisticsPage(),
       ),
     ],
 

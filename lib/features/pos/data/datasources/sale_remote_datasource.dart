@@ -11,6 +11,7 @@ import 'package:uuid/uuid.dart';
 import '../../domain/entities/sale.dart';
 import '../../domain/entities/sale_item.dart';
 import '../../domain/entities/cart_item.dart';
+import '../../domain/repositories/sale_repository.dart' show TopProduct, DailySales, CategoryStat;
 import '../../../../core/constants/app_constants.dart';
 
 class SaleRemoteDatasource {
@@ -273,5 +274,136 @@ class SaleRemoteDatasource {
       avgTicket: month.count > 0 ? month.total / month.count : 0.0,
       paymentMethodCounts: methodCounts,
     );
+  }
+
+  // ── EP-09 (S-10): estadísticas y tendencias ─────────────────
+
+  /// Ids de `sales` en el rango — primer paso del patrón en dos
+  /// consultas ya usado en `getSaleDetail` (evita depender de un
+  /// filtro embebido `sale_items.sales!inner(created_at)` no probado
+  /// en este proyecto). Límite superior exclusivo (`lt`), igual que
+  /// `_sumSales` en `getSalesKpis` — evita contar dos veces una venta
+  /// justo en el límite entre el período actual y el anterior.
+  Future<List<String>> _saleIdsInRange({required DateTime from, required DateTime to}) async {
+    final rows = await _client
+        .from(AppConstants.tableSales)
+        .select('id')
+        .gte('created_at', from.toUtc().toIso8601String())
+        .lt('created_at', to.toUtc().toIso8601String()) as List;
+    return rows.map((r) => (r as Map<String, dynamic>)['id'] as String).toList();
+  }
+
+  Future<List<TopProduct>> getTopProducts({
+    required DateTime from,
+    required DateTime to,
+    String? category,
+    int limit = 10,
+  }) async {
+    final saleIds = await _saleIdsInRange(from: from, to: to);
+    if (saleIds.isEmpty) return const [];
+
+    final rows = await _client
+        .from(AppConstants.tableSaleItems)
+        .select('product_id, product_name, quantity, subtotal, products(category)')
+        .inFilter('sale_id', saleIds) as List;
+
+    final byProduct = <String, ({String name, int units, double amount})>{};
+    for (final r in rows) {
+      final row = r as Map<String, dynamic>;
+      if (category != null) {
+        final rowCategory = (row['products'] as Map<String, dynamic>?)?['category'] as String?;
+        if (rowCategory != category) continue;
+      }
+      final productId = row['product_id'] as String;
+      final quantity = (row['quantity'] as num).toInt();
+      final subtotal = (row['subtotal'] as num).toDouble();
+      final prev = byProduct[productId];
+      byProduct[productId] = (
+        name: row['product_name'] as String,
+        units: (prev?.units ?? 0) + quantity,
+        amount: (prev?.amount ?? 0) + subtotal,
+      );
+    }
+
+    final list = byProduct.entries
+        .map((e) => (
+              productId: e.key,
+              productName: e.value.name,
+              unitsSold: e.value.units,
+              amountTotal: e.value.amount,
+            ))
+        .toList()
+      ..sort((a, b) => b.unitsSold.compareTo(a.unitsSold));
+
+    return list.take(limit).toList();
+  }
+
+  Future<List<DailySales>> getSalesTrend({required DateTime from, required DateTime to}) async {
+    final rows = await _client
+        .from(AppConstants.tableSales)
+        .select('created_at, total')
+        .gte('created_at', from.toUtc().toIso8601String())
+        .lt('created_at', to.toUtc().toIso8601String()) as List;
+
+    final byDay = <DateTime, ({double total, int count})>{};
+    for (final r in rows) {
+      final row = r as Map<String, dynamic>;
+      final createdAt = DateTime.parse(row['created_at'] as String).toLocal();
+      final day = DateTime(createdAt.year, createdAt.month, createdAt.day);
+      final total = (row['total'] as num).toDouble();
+      final prev = byDay[day];
+      byDay[day] = (total: (prev?.total ?? 0) + total, count: (prev?.count ?? 0) + 1);
+    }
+
+    // Rellena con ceros los días sin ventas para una línea continua.
+    final fromDay = DateTime(from.year, from.month, from.day);
+    final toDay = DateTime(to.year, to.month, to.day);
+    final days = <DailySales>[];
+    for (var d = fromDay; !d.isAfter(toDay); d = d.add(const Duration(days: 1))) {
+      final entry = byDay[d];
+      days.add((day: d, total: entry?.total ?? 0.0, count: entry?.count ?? 0));
+    }
+    return days;
+  }
+
+  Future<List<CategoryStat>> getCategoryBreakdown({required DateTime from, required DateTime to}) async {
+    final saleIds = await _saleIdsInRange(from: from, to: to);
+    if (saleIds.isEmpty) return const [];
+
+    final rows = await _client
+        .from(AppConstants.tableSaleItems)
+        .select('quantity, subtotal, unit_price, products(category, cost_price)')
+        .inFilter('sale_id', saleIds) as List;
+
+    final byCategory = <String, ({int units, double amount, double margin})>{};
+    for (final r in rows) {
+      final row = r as Map<String, dynamic>;
+      final product = row['products'] as Map<String, dynamic>?;
+      final category = product?['category'] as String? ?? 'Otros';
+      final costPrice = (product?['cost_price'] as num?)?.toDouble() ?? 0.0;
+      final quantity = (row['quantity'] as num).toInt();
+      final subtotal = (row['subtotal'] as num).toDouble();
+      final unitPrice = (row['unit_price'] as num).toDouble();
+      final margin = (unitPrice - costPrice) * quantity;
+
+      final prev = byCategory[category];
+      byCategory[category] = (
+        units: (prev?.units ?? 0) + quantity,
+        amount: (prev?.amount ?? 0) + subtotal,
+        margin: (prev?.margin ?? 0) + margin,
+      );
+    }
+
+    final list = byCategory.entries
+        .map((e) => (
+              category: e.key,
+              unitsSold: e.value.units,
+              amountTotal: e.value.amount,
+              estimatedMargin: e.value.margin,
+            ))
+        .toList()
+      ..sort((a, b) => b.estimatedMargin.compareTo(a.estimatedMargin));
+
+    return list;
   }
 }

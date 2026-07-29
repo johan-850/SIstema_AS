@@ -128,3 +128,35 @@ class GetSalesKpisUseCase {
 
   Future<SalesKpisResult> call() => _repository.getSalesKpis();
 }
+
+/// US-050: ranking de productos más vendidos en un período.
+class GetTopProductsUseCase {
+  final SaleRepository _repository;
+  const GetTopProductsUseCase(this._repository);
+
+  Future<TopProductsResult> call({
+    required DateTime from,
+    required DateTime to,
+    String? category,
+    int limit = 10,
+  }) =>
+      _repository.getTopProducts(from: from, to: to, category: category, limit: limit);
+}
+
+/// US-051: tendencia de ventas diarias en un período.
+class GetSalesTrendUseCase {
+  final SaleRepository _repository;
+  const GetSalesTrendUseCase(this._repository);
+
+  Future<SalesTrendResult> call({required DateTime from, required DateTime to}) =>
+      _repository.getSalesTrend(from: from, to: to);
+}
+
+/// US-052: rentabilidad estimada por categoría de producto.
+class GetCategoryBreakdownUseCase {
+  final SaleRepository _repository;
+  const GetCategoryBreakdownUseCase(this._repository);
+
+  Future<CategoryBreakdownResult> call({required DateTime from, required DateTime to}) =>
+      _repository.getCategoryBreakdown(from: from, to: to);
+}

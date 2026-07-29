@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../domain/entities/sale.dart';
+import '../../domain/entities/sale_item.dart';
 import '../../domain/entities/cart_item.dart';
 import '../../../../core/constants/app_constants.dart';
 
@@ -16,15 +17,49 @@ class SaleRemoteDatasource {
   final SupabaseClient _client;
   const SaleRemoteDatasource(this._client);
 
-  Sale _fromJson(Map<String, dynamic> json) => Sale(
+  Sale _fromJson(Map<String, dynamic> json) {
+    // El join con profiles (cuando la query lo pide) viene como mapa
+    // anidado en 'profiles' — el RPC confirm_sale no lo trae porque
+    // devuelve la fila plana de `sales`, no hace falta ahí.
+    final profile = json['profiles'] as Map<String, dynamic>?;
+
+    // US-044: sale_items embebidos (solo cuando la query los pide con
+    // `sale_items(product_name, quantity)`) — resumen para la fila del
+    // historial sin tener que abrir el detalle de cada venta.
+    final rawItems = json['sale_items'] as List<dynamic>?;
+    final itemsPreview = rawItems == null
+        ? const <String>[]
+        : rawItems
+            .map((e) => e as Map<String, dynamic>)
+            .map((e) => '${e['product_name']} x${(e['quantity'] as num).toInt()}')
+            .toList();
+
+    return Sale(
+      id: json['id'] as String,
+      total: (json['total'] as num).toDouble(),
+      paymentMethod: json['payment_method'] as String,
+      cashAmount: (json['cash_amount'] as num?)?.toDouble(),
+      transferAmount: (json['transfer_amount'] as num?)?.toDouble(),
+      changeAmount: (json['change_amount'] as num?)?.toDouble(),
+      receiptPhotoUrl: json['receipt_photo_url'] as String?,
+      cashierId: json['cashier_id'] as String?,
+      cashierName: profile?['name'] as String?,
+      cashRegisterId: json['cash_register_id'] as String?,
+      status: json['status'] as String? ?? 'completed',
+      itemsPreview: itemsPreview,
+      createdAt: DateTime.parse(json['created_at'] as String),
+    );
+  }
+
+  SaleItem _itemFromJson(Map<String, dynamic> json, {bool isArchived = false}) => SaleItem(
         id: json['id'] as String,
-        total: (json['total'] as num).toDouble(),
-        paymentMethod: json['payment_method'] as String,
-        cashAmount: (json['cash_amount'] as num?)?.toDouble(),
-        transferAmount: (json['transfer_amount'] as num?)?.toDouble(),
-        changeAmount: (json['change_amount'] as num?)?.toDouble(),
-        receiptPhotoUrl: json['receipt_photo_url'] as String?,
-        createdAt: DateTime.parse(json['created_at'] as String),
+        saleId: json['sale_id'] as String,
+        productId: json['product_id'] as String,
+        productName: json['product_name'] as String,
+        quantity: (json['quantity'] as num).toInt(),
+        unitPrice: (json['unit_price'] as num).toDouble(),
+        subtotal: (json['subtotal'] as num).toDouble(),
+        isProductArchived: isArchived,
       );
 
   Future<Sale> confirmSale({
@@ -106,5 +141,137 @@ class SaleRemoteDatasource {
       'product_name': productName,
       'stock_at_alert': stock,
     });
+  }
+
+  // ── EP-08: historial y reportes (AdminMaster) ──────────────
+
+  Future<List<Sale>> getSalesHistory({
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    String? cashierId,
+    String? paymentMethod,
+    double? minAmount,
+    double? maxAmount,
+    String? searchId,
+    int page = 0,
+    int pageSize = 20,
+  }) async {
+    // US-044: sale_items(product_name, quantity) embebido — evita una
+    // consulta N+1 por fila para mostrar qué se vendió en el historial.
+    var q = _client.from(AppConstants.tableSales).select('*, profiles(name), sale_items(product_name, quantity)');
+
+    if (searchId != null && searchId.trim().isNotEmpty) {
+      q = q.eq('id', searchId.trim());
+    } else {
+      if (dateFrom != null) q = q.gte('created_at', dateFrom.toUtc().toIso8601String());
+      if (dateTo != null) q = q.lte('created_at', dateTo.toUtc().toIso8601String());
+      if (cashierId != null) q = q.eq('cashier_id', cashierId);
+      if (paymentMethod != null) q = q.eq('payment_method', paymentMethod);
+      if (minAmount != null) q = q.gte('total', minAmount);
+      if (maxAmount != null) q = q.lte('total', maxAmount);
+    }
+
+    final result = await q
+        .order('created_at', ascending: false)
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+    return (result as List).map((e) => _fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// US-047/US-049: la venta, sus ítems, y si cada producto sigue
+  /// activo hoy (para la etiqueta "Archivado" del detalle).
+  Future<({Sale sale, List<SaleItem> items})> getSaleDetail(String saleId) async {
+    final saleJson = await _client
+        .from(AppConstants.tableSales)
+        .select('*, profiles(name)')
+        .eq('id', saleId)
+        .single();
+
+    final itemsResult = await _client
+        .from(AppConstants.tableSaleItems)
+        .select()
+        .eq('sale_id', saleId) as List;
+
+    final productIds = itemsResult.map((e) => (e as Map<String, dynamic>)['product_id'] as String).toSet();
+    var archivedIds = <String>{};
+    if (productIds.isNotEmpty) {
+      final productsResult = await _client
+          .from(AppConstants.tableProducts)
+          .select('id, is_active')
+          .inFilter('id', productIds.toList()) as List;
+      archivedIds = productsResult
+          .where((p) => (p as Map<String, dynamic>)['is_active'] == false)
+          .map((p) => (p as Map<String, dynamic>)['id'] as String)
+          .toSet();
+    }
+
+    final items = itemsResult
+        .map((e) => _itemFromJson(
+              e as Map<String, dynamic>,
+              isArchived: archivedIds.contains(e['product_id']),
+            ))
+        .toList();
+
+    return (sale: _fromJson(saleJson), items: items);
+  }
+
+  /// US-048: varias sumas del lado del cliente — mismo criterio ya
+  /// usado en getSalesTotalForPeriod (EP-06) y getClosingPreview (EP-07),
+  /// no hay una función de agregación remota para esto.
+  Future<({double total, int count})> _sumSales({DateTime? from, DateTime? to}) async {
+    var q = _client.from(AppConstants.tableSales).select('total');
+    if (from != null) q = q.gte('created_at', from.toUtc().toIso8601String());
+    if (to != null) q = q.lt('created_at', to.toUtc().toIso8601String());
+    final rows = await q as List;
+    final total = rows.fold<double>(0, (sum, r) => sum + ((r as Map<String, dynamic>)['total'] as num).toDouble());
+    return (total: total, count: rows.length);
+  }
+
+  Future<({
+    double todayTotal,
+    int todayCount,
+    double weekTotal,
+    int weekCount,
+    double weekPrevTotal,
+    double monthTotal,
+    int monthCount,
+    double monthPrevTotal,
+    double avgTicket,
+    Map<String, int> paymentMethodCounts,
+  })> getSalesKpis() async {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final weekStart = todayStart.subtract(Duration(days: now.weekday - 1));
+    final weekPrevStart = weekStart.subtract(const Duration(days: 7));
+    final monthStart = DateTime(now.year, now.month);
+    final monthPrevStart = DateTime(now.year, now.month - 1);
+
+    final today = await _sumSales(from: todayStart, to: now);
+    final week = await _sumSales(from: weekStart, to: now);
+    final weekPrev = await _sumSales(from: weekPrevStart, to: weekStart);
+    final month = await _sumSales(from: monthStart, to: now);
+    final monthPrev = await _sumSales(from: monthPrevStart, to: monthStart);
+
+    final methodRows = await _client
+        .from(AppConstants.tableSales)
+        .select('payment_method')
+        .gte('created_at', monthStart.toUtc().toIso8601String()) as List;
+    final methodCounts = <String, int>{};
+    for (final row in methodRows) {
+      final method = (row as Map<String, dynamic>)['payment_method'] as String;
+      methodCounts[method] = (methodCounts[method] ?? 0) + 1;
+    }
+
+    return (
+      todayTotal: today.total,
+      todayCount: today.count,
+      weekTotal: week.total,
+      weekCount: week.count,
+      weekPrevTotal: weekPrev.total,
+      monthTotal: month.total,
+      monthCount: month.count,
+      monthPrevTotal: monthPrev.total,
+      avgTicket: month.count > 0 ? month.total / month.count : 0.0,
+      paymentMethodCounts: methodCounts,
+    );
   }
 }

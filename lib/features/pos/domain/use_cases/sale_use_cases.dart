@@ -83,3 +83,48 @@ class LogLowStockAlertUseCase {
         stock: stock,
       );
 }
+
+/// US-044: historial de ventas con filtros (AdminMaster).
+class GetSalesHistoryUseCase {
+  final SaleRepository _repository;
+  const GetSalesHistoryUseCase(this._repository);
+
+  Future<SalesHistoryResult> call({
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    String? cashierId,
+    String? paymentMethod,
+    double? minAmount,
+    double? maxAmount,
+    String? searchId,
+    int page = 0,
+    int pageSize = 20,
+  }) =>
+      _repository.getSalesHistory(
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        cashierId: cashierId,
+        paymentMethod: paymentMethod,
+        minAmount: minAmount,
+        maxAmount: maxAmount,
+        searchId: searchId,
+        page: page,
+        pageSize: pageSize,
+      );
+}
+
+/// US-047/US-049: detalle de una venta histórica.
+class GetSaleDetailUseCase {
+  final SaleRepository _repository;
+  const GetSaleDetailUseCase(this._repository);
+
+  Future<SaleDetailResult> call(String saleId) => _repository.getSaleDetail(saleId);
+}
+
+/// US-048: KPIs para el dashboard del AdminMaster.
+class GetSalesKpisUseCase {
+  final SaleRepository _repository;
+  const GetSalesKpisUseCase(this._repository);
+
+  Future<SalesKpisResult> call() => _repository.getSalesKpis();
+}

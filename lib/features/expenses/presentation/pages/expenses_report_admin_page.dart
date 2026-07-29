@@ -13,6 +13,7 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/filter_dropdown.dart';
 import '../../../users/presentation/providers/users_providers.dart';
 import '../../domain/entities/expense.dart';
 import '../providers/expense_providers.dart';
@@ -62,7 +63,7 @@ class ExpensesReportAdminPage extends ConsumerWidget {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _FilterDropdown<String?>(
+                FilterDropdown<String?>(
                   label: 'Cajero',
                   value: state.filterCashierId,
                   items: [
@@ -71,7 +72,7 @@ class ExpensesReportAdminPage extends ConsumerWidget {
                   ],
                   onChanged: notifier.filterByCashier,
                 ),
-                _FilterDropdown<String?>(
+                FilterDropdown<String?>(
                   label: 'Categoría',
                   value: state.filterCategoryId,
                   items: [
@@ -253,42 +254,6 @@ class ExpensesReportAdminPage extends ConsumerWidget {
     final xFile = XFile.fromData(bytes,
         name: 'gastos_${DateTime.now().millisecondsSinceEpoch}.csv', mimeType: 'text/csv');
     await Share.shareXFiles([xFile], text: 'Reporte de gastos de caja');
-  }
-}
-
-class _FilterDropdown<T> extends StatelessWidget {
-  final String label;
-  final T value;
-  final List<DropdownMenuItem<T>> items;
-  final ValueChanged<T> onChanged;
-
-  const _FilterDropdown({
-    required this.label,
-    required this.value,
-    required this.items,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceElevated,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<T>(
-          value: value,
-          hint: Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-          dropdownColor: AppColors.surfaceElevated,
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-          items: items,
-          onChanged: (v) => onChanged(v as T),
-        ),
-      ),
-    );
   }
 }
 

@@ -8,12 +8,11 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/receipt_pdf.dart';
 import '../../domain/entities/cart_item.dart';
 import '../../domain/entities/sale.dart';
 
@@ -23,12 +22,7 @@ class ReceiptPage extends StatelessWidget {
 
   const ReceiptPage({super.key, required this.sale, required this.items});
 
-  static String paymentLabel(String method) => switch (method) {
-        'efectivo' => 'Efectivo',
-        'transferencia' => 'Transferencia',
-        'mixto' => 'Mixto (efectivo + transferencia)',
-        _ => method,
-      };
+  static String paymentLabel(String method) => paymentMethodLabel(method);
 
   @override
   Widget build(BuildContext context) {
@@ -108,7 +102,7 @@ class ReceiptPage extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _sharePdf(currencyFmt, dateFmt),
+                  onPressed: _sharePdf,
                   icon: const Icon(Icons.share_rounded),
                   label: const Text('Compartir PDF'),
                 ),
@@ -116,7 +110,7 @@ class ReceiptPage extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () => _printPdf(currencyFmt, dateFmt),
+                  onPressed: _printPdf,
                   icon: const Icon(Icons.print_outlined),
                   label: const Text('Imprimir'),
                 ),
@@ -138,66 +132,29 @@ class ReceiptPage extends StatelessWidget {
     );
   }
 
-  Future<Uint8List> _buildPdfBytes(NumberFormat currencyFmt, DateFormat dateFmt) async {
-    final doc = pw.Document();
-    doc.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat(58 * PdfPageFormat.mm, double.infinity, marginAll: 4 * PdfPageFormat.mm),
-        build: (pw.Context context) => pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Center(
-              child: pw.Text('Abarrotería Pro',
-                  style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-            ),
-            pw.Center(
-              child: pw.Text(dateFmt.format(sale.createdAt.toLocal()), style: const pw.TextStyle(fontSize: 8)),
-            ),
-            pw.SizedBox(height: 8),
-            pw.Divider(),
-            ...items.map((i) => pw.Padding(
-                  padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                  child: pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Expanded(
-                        child: pw.Text('${i.name} x${i.quantity}', style: const pw.TextStyle(fontSize: 8)),
-                      ),
-                      pw.Text(currencyFmt.format(i.subtotal), style: const pw.TextStyle(fontSize: 8)),
-                    ],
-                  ),
-                )),
-            pw.Divider(),
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text('TOTAL', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                pw.Text(currencyFmt.format(sale.total),
-                    style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-              ],
-            ),
-            pw.SizedBox(height: 6),
-            pw.Text('Método: ${paymentLabel(sale.paymentMethod)}', style: const pw.TextStyle(fontSize: 8)),
-            if (sale.isCash) ...[
-              pw.Text('Recibido: ${currencyFmt.format(sale.cashAmount ?? 0)}', style: const pw.TextStyle(fontSize: 8)),
-              pw.Text('Cambio: ${currencyFmt.format(sale.changeAmount ?? 0)}', style: const pw.TextStyle(fontSize: 8)),
-            ],
-          ],
-        ),
-      ),
-    );
-    return doc.save();
-  }
+  List<ReceiptLineItem> get _lineItems =>
+      items.map((i) => (name: i.name, quantity: i.quantity, subtotal: i.subtotal)).toList();
 
-  Future<void> _sharePdf(NumberFormat currencyFmt, DateFormat dateFmt) async {
-    final bytes = await _buildPdfBytes(currencyFmt, dateFmt);
+  Future<Uint8List> _buildPdfBytes() => buildReceiptPdfBytes(
+        saleId: sale.id,
+        createdAt: sale.createdAt,
+        total: sale.total,
+        paymentMethod: sale.paymentMethod,
+        items: _lineItems,
+        cashAmount: sale.cashAmount,
+        transferAmount: sale.transferAmount,
+        changeAmount: sale.changeAmount,
+      );
+
+  Future<void> _sharePdf() async {
+    final bytes = await _buildPdfBytes();
     final xFile = XFile.fromData(bytes, name: 'recibo_${sale.id}.pdf', mimeType: 'application/pdf');
     await Share.shareXFiles([xFile], text: 'Recibo de venta — Abarrotería Pro');
   }
 
-  Future<void> _printPdf(NumberFormat currencyFmt, DateFormat dateFmt) async {
+  Future<void> _printPdf() async {
     await Printing.layoutPdf(
-      onLayout: (_) => _buildPdfBytes(currencyFmt, dateFmt),
+      onLayout: (_) => _buildPdfBytes(),
       name: 'recibo_${sale.id}',
     );
   }

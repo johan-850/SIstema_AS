@@ -21,6 +21,8 @@ class StoreSettingsRemoteDatasource {
         expenseEditWindowMinutes: (json['expense_edit_window_minutes'] as num?)?.toInt() ?? 10,
         cashDiffCommentThreshold:
             (json['cash_diff_comment_threshold'] as num?)?.toDouble() ?? 5000,
+        weeklyReportEnabled: json['weekly_report_enabled'] as bool? ?? false,
+        weeklyReportEmail: json['weekly_report_email'] as String?,
       );
 
   Future<StoreSettings> getSettings() async {
@@ -96,6 +98,37 @@ class StoreSettingsRemoteDatasource {
       await _client.storage.from(AppConstants.storageBucketStoreAssets).remove([path]);
     } catch (_) {
       /* No crítico */
+    }
+  }
+
+  /// EP-09 (US-054): activar/desactivar el reporte semanal y su correo destino.
+  Future<StoreSettings> updateWeeklyReportSettings({
+    required bool enabled,
+    String? email,
+  }) async {
+    final result = await _client
+        .from(AppConstants.tableStoreSettings)
+        .update({
+          'weekly_report_enabled': enabled,
+          'weekly_report_email': email,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', 1)
+        .select()
+        .single();
+    return _fromJson(result);
+  }
+
+  /// Invoca la Edge Function con `manual: true` — ignora el toggle
+  /// `weekly_report_enabled` y envía igual al correo configurado.
+  Future<void> sendWeeklyReportNow() async {
+    final response = await _client.functions.invoke(
+      AppConstants.fnSendWeeklyReport,
+      body: {'manual': true},
+    );
+    if (response.status != 200) {
+      final msg = (response.data as Map?)?['error'] as String? ?? 'Error al enviar el reporte';
+      throw Exception(msg);
     }
   }
 }

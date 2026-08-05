@@ -160,3 +160,12 @@ class GetCategoryBreakdownUseCase {
   Future<CategoryBreakdownResult> call({required DateTime from, required DateTime to}) =>
       _repository.getCategoryBreakdown(from: from, to: to);
 }
+
+/// US-053: comparativa de desempeño por cajero.
+class GetCashierPerformanceUseCase {
+  final SaleRepository _repository;
+  const GetCashierPerformanceUseCase(this._repository);
+
+  Future<CashierPerformanceResult> call({required DateTime from, required DateTime to}) =>
+      _repository.getCashierPerformance(from: from, to: to);
+}

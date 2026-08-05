@@ -11,7 +11,8 @@ import 'package:uuid/uuid.dart';
 import '../../domain/entities/sale.dart';
 import '../../domain/entities/sale_item.dart';
 import '../../domain/entities/cart_item.dart';
-import '../../domain/repositories/sale_repository.dart' show TopProduct, DailySales, CategoryStat;
+import '../../domain/repositories/sale_repository.dart'
+    show TopProduct, DailySales, CategoryStat, CashierPerformance;
 import '../../../../core/constants/app_constants.dart';
 
 class SaleRemoteDatasource {
@@ -403,6 +404,46 @@ class SaleRemoteDatasource {
             ))
         .toList()
       ..sort((a, b) => b.estimatedMargin.compareTo(a.estimatedMargin));
+
+    return list;
+  }
+
+  Future<List<CashierPerformance>> getCashierPerformance({
+    required DateTime from,
+    required DateTime to,
+  }) async {
+    final rows = await _client
+        .from(AppConstants.tableSales)
+        .select('cashier_id, total, profiles(name)')
+        .gte('created_at', from.toUtc().toIso8601String())
+        .lt('created_at', to.toUtc().toIso8601String()) as List;
+
+    final byCashier = <String, ({String name, double total, int count})>{};
+    for (final r in rows) {
+      final row = r as Map<String, dynamic>;
+      final cashierId = row['cashier_id'] as String?;
+      if (cashierId == null) continue;
+      final name = (row['profiles'] as Map<String, dynamic>?)?['name'] as String? ?? 'Cajero';
+      final total = (row['total'] as num).toDouble();
+
+      final prev = byCashier[cashierId];
+      byCashier[cashierId] = (
+        name: name,
+        total: (prev?.total ?? 0) + total,
+        count: (prev?.count ?? 0) + 1,
+      );
+    }
+
+    final list = byCashier.entries
+        .map((e) => (
+              cashierId: e.key,
+              cashierName: e.value.name,
+              totalSales: e.value.total,
+              transactionCount: e.value.count,
+              avgTicket: e.value.count > 0 ? e.value.total / e.value.count : 0.0,
+            ))
+        .toList()
+      ..sort((a, b) => b.totalSales.compareTo(a.totalSales));
 
     return list;
   }

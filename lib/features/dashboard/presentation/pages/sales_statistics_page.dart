@@ -58,6 +58,8 @@ class SalesStatisticsPage extends ConsumerWidget {
           const _SalesTrendSection(),
           const SizedBox(height: 20),
           const _CategoryBreakdownSection(),
+          const SizedBox(height: 20),
+          const _CashierPerformanceSection(),
         ],
       ),
     );
@@ -561,6 +563,77 @@ class _CategoryDrillDownSheet extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── US-053: desempeño por cajero ──────────────────────────────────
+
+class _CashierPerformanceSection extends ConsumerWidget {
+  const _CashierPerformanceSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cashiersAsync = ref.watch(cashierPerformanceProvider);
+    final currencyFmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
+
+    return _SectionCard(
+      title: 'Desempeño por cajero',
+      child: cashiersAsync.when(
+        loading: _loadingBox,
+        error: (_, _) => _errorBox(),
+        data: (cashiers) {
+          if (cashiers.isEmpty) return _emptyBox('Sin ventas en el período seleccionado.');
+
+          return Column(
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(flex: 2, child: Text('Cajero',
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600))),
+                    Expanded(child: Text('Ventas', textAlign: TextAlign.right,
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600))),
+                    Expanded(child: Text('# Trans.', textAlign: TextAlign.right,
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600))),
+                    Expanded(child: Text('Ticket prom.', textAlign: TextAlign.right,
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600))),
+                  ],
+                ),
+              ),
+              const Divider(color: AppColors.border, height: 16),
+              ...cashiers.map((c) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Text(c.cashierName,
+                              style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ),
+                        Expanded(
+                          child: Text(currencyFmt.format(c.totalSales), textAlign: TextAlign.right,
+                              style: const TextStyle(
+                                  color: AppColors.primary, fontWeight: FontWeight.w600, fontSize: 12)),
+                        ),
+                        Expanded(
+                          child: Text('${c.transactionCount}', textAlign: TextAlign.right,
+                              style: const TextStyle(color: AppColors.textPrimary, fontSize: 12)),
+                        ),
+                        Expanded(
+                          child: Text(currencyFmt.format(c.avgTicket), textAlign: TextAlign.right,
+                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                        ),
+                      ],
+                    ),
+                  )),
+            ],
+          );
+        },
       ),
     );
   }

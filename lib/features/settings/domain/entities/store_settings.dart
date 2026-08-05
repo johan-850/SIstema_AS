@@ -20,16 +20,29 @@ class StoreSettings extends Equatable {
   /// el cajero debe justificar el cierre con un comentario obligatorio.
   final double cashDiffCommentThreshold;
 
+  /// EP-09 (US-054): si está activo, el cron semanal envía el reporte
+  /// a [weeklyReportEmail] — el envío manual de prueba ignora este flag.
+  final bool weeklyReportEnabled;
+  final String? weeklyReportEmail;
+
   const StoreSettings({
     this.qrImageUrl,
     this.maxExpenseAmount,
     this.expenseEditWindowMinutes = 10,
     this.cashDiffCommentThreshold = 5000,
+    this.weeklyReportEnabled = false,
+    this.weeklyReportEmail,
   });
 
   bool get hasQrImage => qrImageUrl != null && qrImageUrl!.isNotEmpty;
 
   @override
-  List<Object?> get props =>
-      [qrImageUrl, maxExpenseAmount, expenseEditWindowMinutes, cashDiffCommentThreshold];
+  List<Object?> get props => [
+        qrImageUrl,
+        maxExpenseAmount,
+        expenseEditWindowMinutes,
+        cashDiffCommentThreshold,
+        weeklyReportEnabled,
+        weeklyReportEmail,
+      ];
 }

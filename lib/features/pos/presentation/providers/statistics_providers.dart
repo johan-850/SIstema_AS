@@ -23,6 +23,10 @@ final getCategoryBreakdownUseCaseProvider = Provider(
   (ref) => GetCategoryBreakdownUseCase(ref.read(saleRepositoryProvider)),
 );
 
+final getCashierPerformanceUseCaseProvider = Provider(
+  (ref) => GetCashierPerformanceUseCase(ref.read(saleRepositoryProvider)),
+);
+
 // ── Selector de período compartido por las 3 secciones ─────────
 
 enum StatsPeriod { week, month, quarter }
@@ -117,4 +121,12 @@ final categoryBreakdownProvider = FutureProvider.autoDispose<List<CategoryStat>>
   final range = ref.watch(statsPeriodProvider).range;
   final result = await ref.read(getCategoryBreakdownUseCaseProvider)(from: range.from, to: range.to);
   return result.categories;
+});
+
+// ── US-053: desempeño por cajero ──────────────────────────────────
+
+final cashierPerformanceProvider = FutureProvider.autoDispose<List<CashierPerformance>>((ref) async {
+  final range = ref.watch(statsPeriodProvider).range;
+  final result = await ref.read(getCashierPerformanceUseCaseProvider)(from: range.from, to: range.to);
+  return result.cashiers;
 });

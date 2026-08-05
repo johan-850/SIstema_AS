@@ -30,4 +30,13 @@ abstract class StoreSettingsRepository {
 
   /// EP-07 (US-041): umbral de diferencia de caja que exige comentario.
   Future<StoreSettingsResult> updateCashDiffCommentThreshold(double threshold);
+
+  /// EP-09 (US-054): activar/desactivar el reporte semanal y su correo destino.
+  Future<StoreSettingsResult> updateWeeklyReportSettings({
+    required bool enabled,
+    String? email,
+  });
+
+  /// EP-09 (US-054): envío de prueba inmediato, ignora el toggle activo/inactivo.
+  Future<Failure?> sendWeeklyReportNow();
 }

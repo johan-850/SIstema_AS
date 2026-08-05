@@ -210,4 +210,14 @@ class SaleRepositoryImpl implements SaleRepository {
       return (categories: <CategoryStat>[], failure: _mapException(e));
     }
   }
+
+  @override
+  Future<CashierPerformanceResult> getCashierPerformance({required DateTime from, required DateTime to}) async {
+    try {
+      final cashiers = await _datasource.getCashierPerformance(from: from, to: to);
+      return (cashiers: cashiers, failure: null);
+    } catch (e) {
+      return (cashiers: <CashierPerformance>[], failure: _mapException(e));
+    }
+  }
 }

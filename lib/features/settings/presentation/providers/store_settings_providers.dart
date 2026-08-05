@@ -41,6 +41,14 @@ final updateCashDiffCommentThresholdUseCaseProvider = Provider(
   (ref) => UpdateCashDiffCommentThresholdUseCase(ref.read(storeSettingsRepositoryProvider)),
 );
 
+final updateWeeklyReportSettingsUseCaseProvider = Provider(
+  (ref) => UpdateWeeklyReportSettingsUseCase(ref.read(storeSettingsRepositoryProvider)),
+);
+
+final sendWeeklyReportNowUseCaseProvider = Provider(
+  (ref) => SendWeeklyReportNowUseCase(ref.read(storeSettingsRepositoryProvider)),
+);
+
 // ── Lectura ─────────────────────────────────────────────────────
 
 /// Configuración del negocio (hoy: solo el QR de pago). Se relee con

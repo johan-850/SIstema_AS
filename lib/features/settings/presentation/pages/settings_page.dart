@@ -80,6 +80,8 @@ class SettingsPage extends ConsumerWidget {
             const _ExpenseSettingsCard(),
             const SizedBox(height: 16),
             const _CashClosingSettingsCard(),
+            const SizedBox(height: 16),
+            const _WeeklyReportSettingsCard(),
           ],
 
           const SizedBox(height: 24),
@@ -566,5 +568,174 @@ class _CashClosingSettingsCardState extends ConsumerState<_CashClosingSettingsCa
     }
     ref.invalidate(storeSettingsProvider);
     AppSnackbar.success(context, 'Configuración guardada');
+  }
+}
+
+/// EP-09 (US-054): activar/desactivar el reporte semanal automático y
+/// probarlo con un envío inmediato antes de confiar en el cron.
+class _WeeklyReportSettingsCard extends ConsumerStatefulWidget {
+  const _WeeklyReportSettingsCard();
+
+  @override
+  ConsumerState<_WeeklyReportSettingsCard> createState() => _WeeklyReportSettingsCardState();
+}
+
+class _WeeklyReportSettingsCardState extends ConsumerState<_WeeklyReportSettingsCard> {
+  final _emailCtrl = TextEditingController();
+  bool _enabled = false;
+  bool _isSaving = false;
+  bool _isSending = false;
+  bool _initialized = false;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settingsAsync = ref.watch(storeSettingsProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.mail_outline_rounded, color: AppColors.primary, size: 20),
+              SizedBox(width: 8),
+              Text('Reporte semanal por correo',
+                  style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 15)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Envía cada lunes 7:00 a.m. un resumen de ventas de la semana, top 5 productos y alertas de stock.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          ),
+          const SizedBox(height: 14),
+          settingsAsync.when(
+            loading: () => const Center(
+              child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(color: AppColors.primary)),
+            ),
+            error: (_, _) => const Text('No se pudo cargar la configuración.',
+                style: TextStyle(color: AppColors.error, fontSize: 13)),
+            data: (settings) {
+              if (!_initialized) {
+                _enabled = settings?.weeklyReportEnabled ?? false;
+                _emailCtrl.text = settings?.weeklyReportEmail ?? '';
+                _initialized = true;
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('Activar reporte semanal',
+                            style: TextStyle(color: AppColors.textPrimary, fontSize: 14)),
+                      ),
+                      Switch(
+                        value: _enabled,
+                        activeThumbColor: AppColors.primary,
+                        onChanged: (v) => setState(() => _enabled = v),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    style: const TextStyle(color: AppColors.textPrimary),
+                    decoration: const InputDecoration(
+                      labelText: 'Correo destino',
+                      prefixIcon: Icon(Icons.alternate_email_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isSaving ? null : _save,
+                          child: _isSaving
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                                )
+                              : const Text('Guardar'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _isSending ? null : _sendNow,
+                          child: _isSending
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                                )
+                              : const Text('Enviar de prueba ahora'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    final email = _emailCtrl.text.trim();
+    if (_enabled && email.isEmpty) {
+      AppSnackbar.error(context, 'Ingresa un correo destino para activar el reporte.');
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    final result = await ref.read(updateWeeklyReportSettingsUseCaseProvider)(
+      enabled: _enabled,
+      email: email.isEmpty ? null : email,
+    );
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+
+    if (result.failure != null) {
+      AppSnackbar.error(context, result.failure!.message);
+      return;
+    }
+    ref.invalidate(storeSettingsProvider);
+    AppSnackbar.success(context, 'Configuración guardada');
+  }
+
+  Future<void> _sendNow() async {
+    if (_emailCtrl.text.trim().isEmpty) {
+      AppSnackbar.error(context, 'Guarda un correo destino antes de enviar la prueba.');
+      return;
+    }
+
+    setState(() => _isSending = true);
+    final failure = await ref.read(sendWeeklyReportNowUseCaseProvider)();
+    if (!mounted) return;
+    setState(() => _isSending = false);
+
+    if (failure != null) {
+      AppSnackbar.error(context, failure.message);
+      return;
+    }
+    AppSnackbar.success(context, 'Reporte enviado');
   }
 }

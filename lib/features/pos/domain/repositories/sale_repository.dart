@@ -58,6 +58,21 @@ typedef CategoryStat = ({
 });
 typedef CategoryBreakdownResult = ({List<CategoryStat> categories, Failure? failure});
 
+// ── EP-09 (S-11): desempeño por cajero (AdminMaster) ─────────────
+
+/// US-053: comparativa de ventas por cajero. No incluye "tiempo
+/// promedio de venta" — `sales` no guarda un timestamp de inicio de
+/// carrito, solo `created_at` (confirmación), así que esa métrica no
+/// es calculable con los datos que existen hoy.
+typedef CashierPerformance = ({
+  String cashierId,
+  String cashierName,
+  double totalSales,
+  int transactionCount,
+  double avgTicket,
+});
+typedef CashierPerformanceResult = ({List<CashierPerformance> cashiers, Failure? failure});
+
 abstract class SaleRepository {
   /// US-030/US-031/US-032: confirma el cobro de una venta de forma
   /// atómica (vía función RPC en Supabase) — crea la venta, sus
@@ -140,6 +155,12 @@ abstract class SaleRepository {
 
   /// US-052: unidades/monto/margen estimado agrupado por categoría.
   Future<CategoryBreakdownResult> getCategoryBreakdown({
+    required DateTime from,
+    required DateTime to,
+  });
+
+  /// US-053: total vendido/# transacciones/ticket promedio por cajero.
+  Future<CashierPerformanceResult> getCashierPerformance({
     required DateTime from,
     required DateTime to,
   });

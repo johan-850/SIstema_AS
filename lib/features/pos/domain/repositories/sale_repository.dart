@@ -32,6 +32,47 @@ typedef SalesKpis = ({
 });
 typedef SalesKpisResult = ({SalesKpis? kpis, Failure? failure});
 
+// ── EP-09 (S-10): estadísticas y tendencias (AdminMaster) ───────
+
+/// US-050: ranking de productos por unidades/monto vendido en un período.
+typedef TopProduct = ({
+  String productId,
+  String productName,
+  int unitsSold,
+  double amountTotal,
+});
+typedef TopProductsResult = ({List<TopProduct> products, Failure? failure});
+
+/// US-051: total vendido por día, para graficar la tendencia.
+typedef DailySales = ({DateTime day, double total, int count});
+typedef SalesTrendResult = ({List<DailySales> days, Failure? failure});
+
+/// US-052: unidades/monto/margen estimado por categoría de producto.
+/// El margen usa el costPrice ACTUAL de cada producto — sale_items no
+/// guarda un snapshot de costo histórico (ver Product.costPrice).
+typedef CategoryStat = ({
+  String category,
+  int unitsSold,
+  double amountTotal,
+  double estimatedMargin,
+});
+typedef CategoryBreakdownResult = ({List<CategoryStat> categories, Failure? failure});
+
+// ── EP-09 (S-11): desempeño por cajero (AdminMaster) ─────────────
+
+/// US-053: comparativa de ventas por cajero. No incluye "tiempo
+/// promedio de venta" — `sales` no guarda un timestamp de inicio de
+/// carrito, solo `created_at` (confirmación), así que esa métrica no
+/// es calculable con los datos que existen hoy.
+typedef CashierPerformance = ({
+  String cashierId,
+  String cashierName,
+  double totalSales,
+  int transactionCount,
+  double avgTicket,
+});
+typedef CashierPerformanceResult = ({List<CashierPerformance> cashiers, Failure? failure});
+
 abstract class SaleRepository {
   /// US-030/US-031/US-032: confirma el cobro de una venta de forma
   /// atómica (vía función RPC en Supabase) — crea la venta, sus
@@ -94,4 +135,33 @@ abstract class SaleRepository {
 
   /// US-048: KPIs para el dashboard del AdminMaster.
   Future<SalesKpisResult> getSalesKpis();
+
+  /// US-050: top productos por unidades vendidas en el rango [from, to].
+  /// [category] filtra el ranking a una sola categoría (drill-down de
+  /// US-052) — mismo cálculo, sin duplicar lógica.
+  Future<TopProductsResult> getTopProducts({
+    required DateTime from,
+    required DateTime to,
+    String? category,
+    int limit = 10,
+  });
+
+  /// US-051: total vendido por día dentro de [from, to], con ceros en
+  /// los días sin ventas (para una línea continua en el gráfico).
+  Future<SalesTrendResult> getSalesTrend({
+    required DateTime from,
+    required DateTime to,
+  });
+
+  /// US-052: unidades/monto/margen estimado agrupado por categoría.
+  Future<CategoryBreakdownResult> getCategoryBreakdown({
+    required DateTime from,
+    required DateTime to,
+  });
+
+  /// US-053: total vendido/# transacciones/ticket promedio por cajero.
+  Future<CashierPerformanceResult> getCashierPerformance({
+    required DateTime from,
+    required DateTime to,
+  });
 }

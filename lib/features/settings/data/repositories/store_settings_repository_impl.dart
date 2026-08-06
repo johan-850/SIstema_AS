@@ -82,4 +82,27 @@ class StoreSettingsRepositoryImpl implements StoreSettingsRepository {
       return (settings: null, failure: _mapException(e));
     }
   }
+
+  @override
+  Future<StoreSettingsResult> updateWeeklyReportSettings({
+    required bool enabled,
+    String? email,
+  }) async {
+    try {
+      final settings = await _datasource.updateWeeklyReportSettings(enabled: enabled, email: email);
+      return (settings: settings, failure: null);
+    } catch (e) {
+      return (settings: null, failure: _mapException(e));
+    }
+  }
+
+  @override
+  Future<Failure?> sendWeeklyReportNow() async {
+    try {
+      await _datasource.sendWeeklyReportNow();
+      return null;
+    } catch (e) {
+      return _mapException(e);
+    }
+  }
 }

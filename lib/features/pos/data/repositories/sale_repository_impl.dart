@@ -170,4 +170,54 @@ class SaleRepositoryImpl implements SaleRepository {
       return (kpis: null, failure: _mapException(e));
     }
   }
+
+  @override
+  Future<TopProductsResult> getTopProducts({
+    required DateTime from,
+    required DateTime to,
+    String? category,
+    int limit = 10,
+  }) async {
+    try {
+      final products = await _datasource.getTopProducts(
+        from: from,
+        to: to,
+        category: category,
+        limit: limit,
+      );
+      return (products: products, failure: null);
+    } catch (e) {
+      return (products: <TopProduct>[], failure: _mapException(e));
+    }
+  }
+
+  @override
+  Future<SalesTrendResult> getSalesTrend({required DateTime from, required DateTime to}) async {
+    try {
+      final days = await _datasource.getSalesTrend(from: from, to: to);
+      return (days: days, failure: null);
+    } catch (e) {
+      return (days: <DailySales>[], failure: _mapException(e));
+    }
+  }
+
+  @override
+  Future<CategoryBreakdownResult> getCategoryBreakdown({required DateTime from, required DateTime to}) async {
+    try {
+      final categories = await _datasource.getCategoryBreakdown(from: from, to: to);
+      return (categories: categories, failure: null);
+    } catch (e) {
+      return (categories: <CategoryStat>[], failure: _mapException(e));
+    }
+  }
+
+  @override
+  Future<CashierPerformanceResult> getCashierPerformance({required DateTime from, required DateTime to}) async {
+    try {
+      final cashiers = await _datasource.getCashierPerformance(from: from, to: to);
+      return (cashiers: cashiers, failure: null);
+    } catch (e) {
+      return (cashiers: <CashierPerformance>[], failure: _mapException(e));
+    }
+  }
 }

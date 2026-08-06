@@ -90,7 +90,7 @@ class AdminDashboardPage extends ConsumerWidget {
                 _ModuleCard(icon: Icons.receipt_long_rounded, label: 'Reportes', color: AppColors.info,
                     onTap: () => context.push('/admin/sales-history')),
                 _ModuleCard(icon: Icons.analytics_rounded, label: 'Estadísticas', color: AppColors.accent,
-                    onTap: () {}),
+                    onTap: () => context.push('/admin/analytics')),
                 _ModuleCard(icon: Icons.settings_outlined, label: 'Configuración', color: AppColors.textSecondary,
                     onTap: () => context.push('/settings')),
               ],

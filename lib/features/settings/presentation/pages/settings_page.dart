@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../core/providers/scan_feedback_providers.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/confirmation_dialog.dart';
@@ -83,6 +84,12 @@ class SettingsPage extends ConsumerWidget {
             const SizedBox(height: 16),
             const _WeeklyReportSettingsCard(),
           ],
+
+          // ── Escaneo (US-057) ───────────────────────────────
+          // Fuera del bloque de AdminMaster a propósito: es preferencia
+          // de este celular y el cajero es quien más escanea.
+          const SizedBox(height: 16),
+          const _ScanFeedbackSettingsCard(),
 
           const SizedBox(height: 24),
           const Divider(),
@@ -737,5 +744,59 @@ class _WeeklyReportSettingsCardState extends ConsumerState<_WeeklyReportSettings
       return;
     }
     AppSnackbar.success(context, 'Reporte enviado');
+  }
+}
+
+/// US-057: sonido y vibración al escanear. Se guarda en el dispositivo,
+/// no en Supabase — silenciar este celular no silencia los demás.
+class _ScanFeedbackSettingsCard extends ConsumerWidget {
+  const _ScanFeedbackSettingsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prefs = ref.watch(scanFeedbackPrefsProvider);
+    final notifier = ref.read(scanFeedbackPrefsProvider.notifier);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.qr_code_scanner_rounded, color: AppColors.primary, size: 20),
+              SizedBox(width: 8),
+              Text('Escaneo',
+                  style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 15)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Aviso al leer un código de barras. Solo aplica a este dispositivo.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          ),
+          const SizedBox(height: 6),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Sonido', style: TextStyle(color: AppColors.textPrimary, fontSize: 14)),
+            value: prefs.soundEnabled,
+            activeThumbColor: AppColors.primary,
+            onChanged: notifier.setSoundEnabled,
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Vibración', style: TextStyle(color: AppColors.textPrimary, fontSize: 14)),
+            value: prefs.vibrationEnabled,
+            activeThumbColor: AppColors.primary,
+            onChanged: notifier.setVibrationEnabled,
+          ),
+        ],
+      ),
+    );
   }
 }

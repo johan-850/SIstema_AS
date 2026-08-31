@@ -5,13 +5,13 @@
 // ============================================================
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/scan_feedback_providers.dart';
 import '../../../../core/utils/stock_tier.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/product_thumbnail.dart';
@@ -287,6 +287,7 @@ class _PosPageState extends ConsumerState<PosPage> {
   }
 
   /// US-025: escanea con la cámara, busca el producto y lo agrega.
+  /// US-057: confirma con sonido/vibración y dice qué se agregó.
   Future<void> _scanAndAdd() async {
     final code = await Navigator.push<String>(
       context,
@@ -295,16 +296,40 @@ class _PosPageState extends ConsumerState<PosPage> {
     if (code == null || !mounted) return;
 
     final result = await ref.read(getProductByBarcodeUseCaseProvider)(code);
-    final product = result.product;
     if (!mounted) return;
 
-    if (product == null || !product.isActive) {
-      AppSnackbar.error(context, 'Producto no encontrado.');
+    final feedback = ref.read(scanFeedbackProvider);
+
+    // La búsqueda por código siempre va a Supabase (no hay caché local),
+    // así que un fallo de red no es lo mismo que un código sin registrar:
+    // decirle "producto no encontrado" al cajero sin internet lo manda a
+    // buscar un producto que sí existe.
+    if (result.failure != null) {
+      await feedback.failure();
+      if (!mounted) return;
+      AppSnackbar.error(context, 'No se pudo consultar el código: ${result.failure!.message}');
       return;
     }
 
-    HapticFeedback.mediumImpact();
+    final product = result.product;
+    if (product == null) {
+      await feedback.failure();
+      if (!mounted) return;
+      AppSnackbar.error(context, 'El código $code no está registrado.');
+      return;
+    }
+
+    if (!product.isActive) {
+      await feedback.failure();
+      if (!mounted) return;
+      AppSnackbar.warning(context, '"${product.name}" está archivado y no se puede vender.');
+      return;
+    }
+
+    await feedback.success();
+    if (!mounted) return;
     ref.read(cartProvider.notifier).addProduct(product);
+    AppSnackbar.success(context, '${product.name} agregado al carrito.');
   }
 }
 

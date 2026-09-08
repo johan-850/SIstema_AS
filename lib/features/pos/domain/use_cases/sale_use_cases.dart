@@ -83,3 +83,89 @@ class LogLowStockAlertUseCase {
         stock: stock,
       );
 }
+
+/// US-044: historial de ventas con filtros (AdminMaster).
+class GetSalesHistoryUseCase {
+  final SaleRepository _repository;
+  const GetSalesHistoryUseCase(this._repository);
+
+  Future<SalesHistoryResult> call({
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    String? cashierId,
+    String? paymentMethod,
+    double? minAmount,
+    double? maxAmount,
+    String? searchId,
+    int page = 0,
+    int pageSize = 20,
+  }) =>
+      _repository.getSalesHistory(
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        cashierId: cashierId,
+        paymentMethod: paymentMethod,
+        minAmount: minAmount,
+        maxAmount: maxAmount,
+        searchId: searchId,
+        page: page,
+        pageSize: pageSize,
+      );
+}
+
+/// US-047/US-049: detalle de una venta histórica.
+class GetSaleDetailUseCase {
+  final SaleRepository _repository;
+  const GetSaleDetailUseCase(this._repository);
+
+  Future<SaleDetailResult> call(String saleId) => _repository.getSaleDetail(saleId);
+}
+
+/// US-048: KPIs para el dashboard del AdminMaster.
+class GetSalesKpisUseCase {
+  final SaleRepository _repository;
+  const GetSalesKpisUseCase(this._repository);
+
+  Future<SalesKpisResult> call() => _repository.getSalesKpis();
+}
+
+/// US-050: ranking de productos más vendidos en un período.
+class GetTopProductsUseCase {
+  final SaleRepository _repository;
+  const GetTopProductsUseCase(this._repository);
+
+  Future<TopProductsResult> call({
+    required DateTime from,
+    required DateTime to,
+    String? category,
+    int limit = 10,
+  }) =>
+      _repository.getTopProducts(from: from, to: to, category: category, limit: limit);
+}
+
+/// US-051: tendencia de ventas diarias en un período.
+class GetSalesTrendUseCase {
+  final SaleRepository _repository;
+  const GetSalesTrendUseCase(this._repository);
+
+  Future<SalesTrendResult> call({required DateTime from, required DateTime to}) =>
+      _repository.getSalesTrend(from: from, to: to);
+}
+
+/// US-052: rentabilidad estimada por categoría de producto.
+class GetCategoryBreakdownUseCase {
+  final SaleRepository _repository;
+  const GetCategoryBreakdownUseCase(this._repository);
+
+  Future<CategoryBreakdownResult> call({required DateTime from, required DateTime to}) =>
+      _repository.getCategoryBreakdown(from: from, to: to);
+}
+
+/// US-053: comparativa de desempeño por cajero.
+class GetCashierPerformanceUseCase {
+  final SaleRepository _repository;
+  const GetCashierPerformanceUseCase(this._repository);
+
+  Future<CashierPerformanceResult> call({required DateTime from, required DateTime to}) =>
+      _repository.getCashierPerformance(from: from, to: to);
+}

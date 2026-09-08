@@ -20,6 +20,12 @@ import '../../features/users/presentation/pages/users_list_page.dart';
 import '../../features/users/presentation/pages/create_cashier_page.dart';
 import '../../features/users/presentation/pages/cashier_detail_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
+import '../../features/expenses/presentation/pages/shift_expenses_page.dart';
+import '../../features/expenses/presentation/pages/expense_categories_admin_page.dart';
+import '../../features/expenses/presentation/pages/expenses_report_admin_page.dart';
+import '../../features/dashboard/presentation/pages/sales_history_page.dart';
+import '../../features/dashboard/presentation/pages/sale_detail_page.dart';
+import '../../features/dashboard/presentation/pages/sales_statistics_page.dart';
 
 // ── Rutas nombradas ─────────────────────────────────────────
 abstract class AppRoutes {
@@ -39,6 +45,11 @@ abstract class AppRoutes {
   static const settings             = '/settings';
   static const reports              = '/admin/reports';
   static const analytics            = '/admin/analytics';
+  static const posExpenses          = '/pos/expenses';           // US-035
+  static const expensesReport       = '/admin/expenses';         // US-037
+  static const expenseCategories    = '/admin/expenses/categories'; // US-036
+  static const salesHistory         = '/admin/sales-history';    // US-044
+  static const saleDetail           = '/admin/sales-history/:id'; // US-047
 }
 
 
@@ -166,6 +177,39 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.inventoryRestock,
         name: 'inventory-restock',
         builder: (_, _) => const RestockListPage(),
+      ),
+      // EP-06: Gastos de Caja
+      GoRoute(
+        path: AppRoutes.posExpenses,
+        name: 'pos-expenses',
+        builder: (_, _) => const ShiftExpensesPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.expensesReport,
+        name: 'expenses-report',
+        builder: (_, _) => const ExpensesReportAdminPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.expenseCategories,
+        name: 'expense-categories',
+        builder: (_, _) => const ExpenseCategoriesAdminPage(),
+      ),
+      // EP-08: Historial de Ventas y Reportes
+      GoRoute(
+        path: AppRoutes.salesHistory,
+        name: 'sales-history',
+        builder: (_, _) => const SalesHistoryPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.saleDetail,
+        name: 'sale-detail',
+        builder: (_, state) => SaleDetailPage(saleId: state.pathParameters['id']!),
+      ),
+      // EP-09 (S-10): Estadísticas y tendencias de ventas
+      GoRoute(
+        path: AppRoutes.analytics,
+        name: 'sales-statistics',
+        builder: (_, _) => const SalesStatisticsPage(),
       ),
     ],
 

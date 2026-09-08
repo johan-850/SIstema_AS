@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/confirmation_dialog.dart';
+import '../../../expenses/presentation/providers/expense_providers.dart';
 import '../providers/users_providers.dart';
 
 /// US-004 / US-006 — Detalle del cajero: toggle de estado y reset de contraseña
@@ -103,6 +104,18 @@ class CashierDetailPage extends ConsumerWidget {
               subtitle: 'Envía un enlace de restablecimiento al correo del cajero. No verás la nueva contraseña.',
               onTap: () => _confirmReset(context, ref, cashier.email),
             ),
+            const SizedBox(height: 12),
+
+            // ── US-038: Módulo de gastos ────────────────────
+            _ActionTile(
+              icon: cashier.expensesEnabled ? Icons.payments_outlined : Icons.money_off_rounded,
+              color: cashier.expensesEnabled ? AppColors.primary : AppColors.textSecondary,
+              title: cashier.expensesEnabled ? 'Módulo de gastos habilitado' : 'Módulo de gastos deshabilitado',
+              subtitle: cashier.expensesEnabled
+                  ? 'El cajero puede registrar gastos de caja durante su turno.'
+                  : 'El cajero no ve la opción de registrar gastos en el POS.',
+              onTap: () => _confirmToggleExpenses(context, ref, cashier.id, cashier.expensesEnabled, cashier.name),
+            ),
           ],
         ),
       ),
@@ -145,6 +158,33 @@ class CashierDetailPage extends ConsumerWidget {
         final ok = await ref.read(cashierListProvider.notifier).toggleStatus(id, !isActive);
         if (context.mounted) {
           if (ok) AppSnackbar.success(context, isActive ? 'Cuenta desactivada' : 'Cuenta activada');
+        }
+      },
+    );
+  }
+
+  Future<void> _confirmToggleExpenses(
+      BuildContext context, WidgetRef ref, String id, bool currentlyEnabled, String name) async {
+    final newValue = !currentlyEnabled;
+    await ConfirmationDialog.show(
+      context,
+      title: newValue ? 'Habilitar módulo de gastos' : 'Deshabilitar módulo de gastos',
+      message: newValue
+          ? '¿Permitir que $name registre gastos de caja?'
+          : '¿Quitarle a $name el acceso para registrar gastos de caja?',
+      confirmLabel: newValue ? 'Habilitar' : 'Deshabilitar',
+      isDangerous: !newValue,
+      onConfirm: () async {
+        final failure = await ref
+            .read(setCashierExpensesEnabledUseCaseProvider)(cashierId: id, enabled: newValue);
+        if (!context.mounted) return;
+        if (failure != null) {
+          AppSnackbar.error(context, failure.message);
+          return;
+        }
+        await ref.read(cashierListProvider.notifier).load();
+        if (context.mounted) {
+          AppSnackbar.success(context, newValue ? 'Módulo de gastos habilitado' : 'Módulo de gastos deshabilitado');
         }
       },
     );

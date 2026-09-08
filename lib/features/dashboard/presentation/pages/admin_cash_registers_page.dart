@@ -9,8 +9,10 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/widgets/filter_dropdown.dart';
 import '../../../cash_register/domain/entities/cash_register.dart';
 import '../../../cash_register/presentation/providers/cash_register_providers.dart';
+import '../../../users/presentation/providers/users_providers.dart';
 
 class AdminCashRegistersPage extends ConsumerStatefulWidget {
   const AdminCashRegistersPage({super.key});
@@ -76,6 +78,8 @@ class _AdminCashRegistersPageState
       BuildContext context, RegisterHistoryNotifier notifier) {
     DateTime? from;
     DateTime? to;
+    String? cashierId;
+    final cashiers = ref.read(cashierListProvider).cashiers;
 
     showModalBottomSheet(
       context: context,
@@ -98,6 +102,18 @@ class _AdminCashRegistersPageState
                     color: AppColors.textPrimary),
               ),
               const SizedBox(height: 20),
+
+              // Cajero (US-045)
+              FilterDropdown<String?>(
+                label: 'Cajero',
+                value: cashierId,
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('Todos')),
+                  ...cashiers.map((c) => DropdownMenuItem(value: c.id, child: Text(c.name))),
+                ],
+                onChanged: (v) => setModal(() => cashierId = v),
+              ),
+              const SizedBox(height: 12),
 
               // Fecha desde
               _DatePickerTile(
@@ -131,7 +147,7 @@ class _AdminCashRegistersPageState
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.pop(ctx);
-                        notifier.applyFilters(from: from, to: to);
+                        notifier.applyFilters(from: from, to: to, cashierId: cashierId);
                       },
                       child: const Text('Aplicar'),
                     ),
@@ -192,6 +208,7 @@ class _RegisterCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final local = register.openingTime.toLocal();
     final isOpen = register.isOpen;
+    final isClosing = register.isClosing;
 
     return InkWell(
       onTap: onTap,
@@ -204,7 +221,9 @@ class _RegisterCard extends StatelessWidget {
           border: Border.all(
             color: isOpen
                 ? AppColors.primary.withValues(alpha: 0.4)
-                : AppColors.border,
+                : isClosing
+                    ? AppColors.stockNearVivid.withValues(alpha: 0.5)
+                    : AppColors.border,
           ),
         ),
         child: Row(
@@ -259,24 +278,51 @@ class _RegisterCard extends StatelessWidget {
               ),
             ),
 
-            // ── Badge estado ──────────────────────────────────
+            // ── Badge estado (Abierta / Cerrando / Cerrada) ────
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: isOpen
                     ? AppColors.success.withValues(alpha: 0.15)
-                    : AppColors.surfaceElevated,
+                    : isClosing
+                        ? AppColors.stockNearVivid.withValues(alpha: 0.15)
+                        : AppColors.surfaceElevated,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
-                isOpen ? 'Abierta' : 'Cerrada',
+                isOpen ? 'Abierta' : (isClosing ? 'Cerrando' : 'Cerrada'),
                 style: TextStyle(
-                  color: isOpen ? AppColors.success : AppColors.textSecondary,
+                  color: isOpen
+                      ? AppColors.success
+                      : isClosing
+                          ? AppColors.stockNearVivid
+                          : AppColors.textSecondary,
                   fontWeight: FontWeight.w600,
                   fontSize: 11,
                 ),
               ),
             ),
+            // US-045: punto ok/alerta según la diferencia del cuadre.
+            if (register.isClosed && register.closingSummary != null) ...[
+              const SizedBox(width: 8),
+              Tooltip(
+                message: register.closingSummary!.difference == 0
+                    ? 'Cuadre exacto'
+                    : 'Diferencia: ${NumberFormat('#,###', 'es_CO').format(register.closingSummary!.difference.abs())}',
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: register.closingSummary!.difference == 0
+                        ? AppColors.success
+                        : (register.closingSummary!.difference.abs() <= 5000
+                            ? AppColors.stockNearVivid
+                            : AppColors.stockCriticalVivid),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(width: 6),
             const Icon(Icons.chevron_right_rounded,
                 color: AppColors.textDisabled, size: 20),
@@ -414,7 +460,102 @@ class _RegisterDetailSheet extends StatelessWidget {
             ),
           ),
         ],
+
+        // ── Cuadre de cierre (US-042) ────────────────────────
+        if (register.isClosed && register.closingSummary != null) ...[
+          const SizedBox(height: 20),
+          const Divider(color: AppColors.border),
+          const SizedBox(height: 12),
+          const _SheetSectionLabel('Cuadre de cierre'),
+          const SizedBox(height: 8),
+          _CuadreRow(label: 'Ventas efectivo', value: register.closingSummary!.salesEfectivo, currencyFmt: currencyFmt),
+          _CuadreRow(label: 'Ventas mixto (efectivo)', value: register.closingSummary!.salesMixtoEfectivo, currencyFmt: currencyFmt),
+          _CuadreRow(label: 'Ventas transferencia', value: register.closingSummary!.salesTransferencia, currencyFmt: currencyFmt),
+          _CuadreRow(label: 'Total ventas', value: register.closingSummary!.salesTotal, currencyFmt: currencyFmt, emphasize: true),
+          _CuadreRow(label: 'Transacciones', value: register.closingSummary!.transactionCount.toDouble(), currencyFmt: currencyFmt, isCount: true),
+          _CuadreRow(label: 'Gastos', value: register.closingSummary!.totalExpenses, currencyFmt: currencyFmt),
+          const SizedBox(height: 8),
+          _CuadreRow(label: 'Efectivo esperado', value: register.closingSummary!.expectedCash, currencyFmt: currencyFmt, emphasize: true),
+          _CuadreRow(label: 'Efectivo contado', value: register.closingSummary!.countedCash, currencyFmt: currencyFmt, emphasize: true),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 5),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Diferencia',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 14, fontWeight: FontWeight.w700)),
+                Text(
+                  '\$${currencyFmt.format(register.closingSummary!.difference)}',
+                  style: TextStyle(
+                    color: register.closingSummary!.difference == 0
+                        ? AppColors.success
+                        : (register.closingSummary!.difference.abs() <= 5000
+                            ? AppColors.stockNearVivid
+                            : AppColors.stockCriticalVivid),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (register.closingNotes != null && register.closingNotes!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceElevated,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                register.closingNotes!,
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, height: 1.5),
+              ),
+            ),
+          ],
+        ],
       ],
+    );
+  }
+}
+
+class _CuadreRow extends StatelessWidget {
+  final String label;
+  final double value;
+  final NumberFormat currencyFmt;
+  final bool emphasize;
+  final bool isCount;
+
+  const _CuadreRow({
+    required this.label,
+    required this.value,
+    required this.currencyFmt,
+    this.emphasize = false,
+    this.isCount = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: emphasize ? FontWeight.w600 : FontWeight.normal)),
+          Text(
+            isCount ? value.toInt().toString() : '\$${currencyFmt.format(value)}',
+            style: TextStyle(
+              color: emphasize ? AppColors.textPrimary : AppColors.textSecondary,
+              fontSize: emphasize ? 14 : 13,
+              fontWeight: emphasize ? FontWeight.w700 : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

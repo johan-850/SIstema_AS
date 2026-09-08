@@ -5,19 +5,20 @@
 // ============================================================
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/scan_feedback_providers.dart';
 import '../../../../core/utils/stock_tier.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/product_thumbnail.dart';
 import '../../../../core/widgets/barcode_scanner_page.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../cash_register/domain/entities/cash_register.dart';
+import '../../../cash_register/presentation/pages/cash_register_closing_page.dart';
 import '../../../cash_register/presentation/providers/cash_register_providers.dart';
 import '../../../products/domain/entities/product.dart';
 import '../../../products/presentation/providers/product_providers.dart'
@@ -119,6 +120,13 @@ class _PosPageState extends ConsumerState<PosPage> {
             icon: const Icon(Icons.access_time_rounded),
             onPressed: () => _showShiftInfo(context, register),
           ),
+          // US-038: oculto si el AdminMaster deshabilitó el módulo para este cajero.
+          if (user?.expensesEnabled ?? true)
+            IconButton(
+              tooltip: 'Gastos',
+              icon: const Icon(Icons.payments_outlined),
+              onPressed: () => context.push('/pos/expenses'),
+            ),
           IconButton(
             tooltip: 'Configuración',
             icon: const Icon(Icons.settings_outlined),
@@ -246,13 +254,40 @@ class _PosPageState extends ConsumerState<PosPage> {
               const SizedBox(height: 8),
               _ShiftInfoRow(label: 'Notas', value: register.notes!),
             ],
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _goToClosing(context, register);
+                },
+                icon: const Icon(Icons.lock_clock_outlined),
+                label: const Text('Cerrar caja'),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
+  /// US-039: abre el wizard de cierre — igual patrón de Navigator.push
+  /// (no go_router) que BarcodeScannerPage/CheckoutPage, porque el
+  /// register no es serializable a una ruta con nombre.
+  void _goToClosing(BuildContext context, CashRegister register) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => CashRegisterClosingPage(register: register)),
+    );
+  }
+
   /// US-025: escanea con la cámara, busca el producto y lo agrega.
+  /// US-057: confirma con sonido/vibración y dice qué se agregó.
   Future<void> _scanAndAdd() async {
     final code = await Navigator.push<String>(
       context,
@@ -261,16 +296,40 @@ class _PosPageState extends ConsumerState<PosPage> {
     if (code == null || !mounted) return;
 
     final result = await ref.read(getProductByBarcodeUseCaseProvider)(code);
-    final product = result.product;
     if (!mounted) return;
 
-    if (product == null || !product.isActive) {
-      AppSnackbar.error(context, 'Producto no encontrado.');
+    final feedback = ref.read(scanFeedbackProvider);
+
+    // La búsqueda por código siempre va a Supabase (no hay caché local),
+    // así que un fallo de red no es lo mismo que un código sin registrar:
+    // decirle "producto no encontrado" al cajero sin internet lo manda a
+    // buscar un producto que sí existe.
+    if (result.failure != null) {
+      await feedback.failure();
+      if (!mounted) return;
+      AppSnackbar.error(context, 'No se pudo consultar el código: ${result.failure!.message}');
       return;
     }
 
-    HapticFeedback.mediumImpact();
+    final product = result.product;
+    if (product == null) {
+      await feedback.failure();
+      if (!mounted) return;
+      AppSnackbar.error(context, 'El código $code no está registrado.');
+      return;
+    }
+
+    if (!product.isActive) {
+      await feedback.failure();
+      if (!mounted) return;
+      AppSnackbar.warning(context, '"${product.name}" está archivado y no se puede vender.');
+      return;
+    }
+
+    await feedback.success();
+    if (!mounted) return;
     ref.read(cartProvider.notifier).addProduct(product);
+    AppSnackbar.success(context, '${product.name} agregado al carrito.');
   }
 }
 

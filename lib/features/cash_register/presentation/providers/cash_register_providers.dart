@@ -37,6 +37,18 @@ final getRegisterHistoryUseCaseProvider = Provider(
   (ref) => GetRegisterHistoryUseCase(ref.read(cashRegisterRepositoryProvider)),
 );
 
+final startRegisterClosingUseCaseProvider = Provider(
+  (ref) => StartRegisterClosingUseCase(ref.read(cashRegisterRepositoryProvider)),
+);
+
+final closeRegisterUseCaseProvider = Provider(
+  (ref) => CloseRegisterUseCase(ref.read(cashRegisterRepositoryProvider)),
+);
+
+final getClosingPreviewUseCaseProvider = Provider(
+  (ref) => GetClosingPreviewUseCase(ref.read(cashRegisterRepositoryProvider)),
+);
+
 // ── US-008: Caja activa del cajero actual (FutureProvider) ────
 
 /// Carga la caja activa del cajero autenticado.
@@ -309,4 +321,191 @@ class RegisterHistoryNotifier extends StateNotifier<RegisterHistoryState> {
 final registerHistoryProvider =
     StateNotifierProvider<RegisterHistoryNotifier, RegisterHistoryState>(
   (ref) => RegisterHistoryNotifier(ref.read(getRegisterHistoryUseCaseProvider)),
+);
+
+// ── US-039/040/041/042: Wizard de cierre de caja ──────────────
+
+/// Argumentos para instanciar el wizard de cierre de una caja puntual.
+typedef ClosingArgs = ({String registerId, double openingAmount});
+
+class RegisterClosingState {
+  /// Cantidades ingresadas por denominación al contar el efectivo final.
+  final Map<String, int> breakdown;
+
+  /// Comentario del cajero (US-041)
+  final String notes;
+
+  /// Paso actual del wizard: 0=resumen previo, 1=conteo, 2=comentario/confirmar
+  final int currentStep;
+
+  final bool isLoading;
+
+  /// true una vez que start_register_closing() ya se ejecutó — la caja
+  /// pasó a 'closing' y dejó de aceptar ventas/gastos nuevos.
+  final bool started;
+
+  final bool success;
+  final Failure? failure;
+  final ClosingPreview? preview;
+  final CashRegister? closedRegister;
+
+  const RegisterClosingState({
+    this.breakdown = const {},
+    this.notes = '',
+    this.currentStep = 0,
+    this.isLoading = false,
+    this.started = false,
+    this.success = false,
+    this.failure,
+    this.preview,
+    this.closedRegister,
+  });
+
+  double get total {
+    double sum = 0;
+    for (final entry in breakdown.entries) {
+      final value = AppConstants.coinDenominations[entry.key] ??
+          AppConstants.billDenominations[entry.key] ??
+          0;
+      sum += value * entry.value;
+    }
+    return sum;
+  }
+
+  Map<String, int> get nonZeroBreakdown =>
+      Map.fromEntries(breakdown.entries.where((e) => e.value > 0));
+
+  /// Diferencia contra el efectivo esperado — null hasta que cargue el
+  /// resumen previo.
+  double? get difference => preview != null ? total - preview!.expectedCash : null;
+
+  RegisterClosingState copyWith({
+    Map<String, int>? breakdown,
+    String? notes,
+    int? currentStep,
+    bool? isLoading,
+    bool? started,
+    bool? success,
+    Failure? failure,
+    ClosingPreview? preview,
+    CashRegister? closedRegister,
+    bool clearFailure = false,
+  }) =>
+      RegisterClosingState(
+        breakdown: breakdown ?? this.breakdown,
+        notes: notes ?? this.notes,
+        currentStep: currentStep ?? this.currentStep,
+        isLoading: isLoading ?? this.isLoading,
+        started: started ?? this.started,
+        success: success ?? this.success,
+        failure: clearFailure ? null : (failure ?? this.failure),
+        preview: preview ?? this.preview,
+        closedRegister: closedRegister ?? this.closedRegister,
+      );
+}
+
+class RegisterClosingNotifier extends StateNotifier<RegisterClosingState> {
+  final GetClosingPreviewUseCase _getPreview;
+  final StartRegisterClosingUseCase _startClosing;
+  final CloseRegisterUseCase _closeRegister;
+  final String _registerId;
+  final double _openingAmount;
+
+  RegisterClosingNotifier(
+    this._getPreview,
+    this._startClosing,
+    this._closeRegister,
+    this._registerId,
+    this._openingAmount,
+  ) : super(const RegisterClosingState()) {
+    _initBreakdown();
+    loadPreview();
+  }
+
+  void _initBreakdown() {
+    final initial = <String, int>{};
+    for (final key in AppConstants.coinDenominations.keys) {
+      initial[key] = 0;
+    }
+    for (final key in AppConstants.billDenominations.keys) {
+      initial[key] = 0;
+    }
+    state = state.copyWith(breakdown: initial);
+  }
+
+  /// US-039: resumen previo (solo lectura) antes de iniciar el cierre.
+  Future<void> loadPreview() async {
+    state = state.copyWith(isLoading: true, clearFailure: true);
+    final result =
+        await _getPreview(registerId: _registerId, openingAmount: _openingAmount);
+    state = result.failure != null
+        ? state.copyWith(isLoading: false, failure: result.failure)
+        : state.copyWith(isLoading: false, preview: result.preview);
+  }
+
+  /// US-039: confirma iniciar el cierre — bloquea ventas/gastos nuevos.
+  Future<bool> confirmStart() async {
+    state = state.copyWith(isLoading: true, clearFailure: true);
+    final result = await _startClosing(_registerId);
+    if (result.failure != null) {
+      state = state.copyWith(isLoading: false, failure: result.failure);
+      return false;
+    }
+    state = state.copyWith(isLoading: false, started: true, currentStep: 1);
+    return true;
+  }
+
+  void increment(String key) {
+    final updated = Map<String, int>.from(state.breakdown);
+    updated[key] = (updated[key] ?? 0) + 1;
+    state = state.copyWith(breakdown: updated);
+  }
+
+  void decrement(String key) {
+    final updated = Map<String, int>.from(state.breakdown);
+    final current = updated[key] ?? 0;
+    if (current > 0) updated[key] = current - 1;
+    state = state.copyWith(breakdown: updated);
+  }
+
+  void setQuantity(String key, int qty) {
+    final updated = Map<String, int>.from(state.breakdown);
+    updated[key] = qty.clamp(0, 9999);
+    state = state.copyWith(breakdown: updated);
+  }
+
+  void updateNotes(String notes) => state = state.copyWith(notes: notes);
+
+  void goToStep(int step) => state = state.copyWith(currentStep: step);
+
+  /// US-040/041/042: confirma el cuadre final.
+  Future<bool> confirmClose() async {
+    state = state.copyWith(isLoading: true, clearFailure: true);
+
+    final result = await _closeRegister(
+      registerId: _registerId,
+      closingBreakdown: state.nonZeroBreakdown,
+      closingAmount: state.total,
+      closingNotes: state.notes.isNotEmpty ? state.notes : null,
+    );
+
+    if (result.failure != null) {
+      state = state.copyWith(isLoading: false, failure: result.failure);
+      return false;
+    }
+
+    state = state.copyWith(isLoading: false, success: true, closedRegister: result.register);
+    return true;
+  }
+}
+
+final registerClosingProvider = StateNotifierProvider.autoDispose
+    .family<RegisterClosingNotifier, RegisterClosingState, ClosingArgs>(
+  (ref, args) => RegisterClosingNotifier(
+    ref.read(getClosingPreviewUseCaseProvider),
+    ref.read(startRegisterClosingUseCaseProvider),
+    ref.read(closeRegisterUseCaseProvider),
+    args.registerId,
+    args.openingAmount,
+  ),
 );

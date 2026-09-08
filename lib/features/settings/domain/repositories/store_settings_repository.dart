@@ -20,4 +20,23 @@ abstract class StoreSettingsRepository {
 
   /// Quita el QR configurado (borra el archivo y limpia la URL guardada).
   Future<StoreSettingsResult> removeQrImage(String currentUrl);
+
+  /// EP-06: guarda el monto máximo de gasto sugerido y la ventana de
+  /// edición de gastos recién registrados.
+  Future<StoreSettingsResult> updateExpenseSettings({
+    double? maxExpenseAmount,
+    required int expenseEditWindowMinutes,
+  });
+
+  /// EP-07 (US-041): umbral de diferencia de caja que exige comentario.
+  Future<StoreSettingsResult> updateCashDiffCommentThreshold(double threshold);
+
+  /// EP-09 (US-054): activar/desactivar el reporte semanal y su correo destino.
+  Future<StoreSettingsResult> updateWeeklyReportSettings({
+    required bool enabled,
+    String? email,
+  });
+
+  /// EP-09 (US-054): envío de prueba inmediato, ignora el toggle activo/inactivo.
+  Future<Failure?> sendWeeklyReportNow();
 }

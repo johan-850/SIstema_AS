@@ -54,9 +54,14 @@ abstract class AppConstants {
   static const String storageBucketStoreAssets     = 'store-assets';
   static const String storageBucketReceiptPhotos   = 'receipt-photos';
 
+  // ── Tablas Supabase — EP-06 (Gastos de Caja) ──────────────
+  static const String tableExpenses          = 'expenses';
+  static const String tableExpenseCategories = 'expense_categories';
+
   // ── Edge Functions ────────────────────────────────────────
   static const String fnCreateCashier        = 'create-cashier';
   static const String fnToggleCashierStatus  = 'toggle-cashier-status';
+  static const String fnSendWeeklyReport     = 'send-weekly-report';
 
   // ── Validación ────────────────────────────────────────────
   static const int minPasswordLength = 6;

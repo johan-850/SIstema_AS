@@ -133,11 +133,11 @@ class ProductRemoteDatasource {
       'min_stock': minStock,
       'unit': unit,
       'is_active': true,
-      if (barcode != null) 'barcode': barcode,
-      if (description != null) 'description': description,
-      if (imageUrl != null) 'image_url': imageUrl,
-      if (supplier != null) 'supplier': supplier,
-      if (userId != null) 'created_by': userId,
+      'barcode': ?barcode,
+      'description': ?description,
+      'image_url': ?imageUrl,
+      'supplier': ?supplier,
+      'created_by': ?userId,
     };
 
     final result = await _client
@@ -169,18 +169,18 @@ class ProductRemoteDatasource {
     String? supplier,
   }) async {
     final payload = <String, dynamic>{
-      if (barcode != null) 'barcode': barcode,
-      if (name != null) 'name': name,
-      if (description != null) 'description': description,
-      if (category != null) 'category': category,
-      if (price != null) 'price': price,
-      if (costPrice != null) 'cost_price': costPrice,
-      if (stock != null) 'stock': stock,
-      if (minStock != null) 'min_stock': minStock,
-      if (unit != null) 'unit': unit,
-      if (isActive != null) 'is_active': isActive,
-      if (imageUrl != null) 'image_url': imageUrl,
-      if (supplier != null) 'supplier': supplier,
+      'barcode': ?barcode,
+      'name': ?name,
+      'description': ?description,
+      'category': ?category,
+      'price': ?price,
+      'cost_price': ?costPrice,
+      'stock': ?stock,
+      'min_stock': ?minStock,
+      'unit': ?unit,
+      'is_active': ?isActive,
+      'image_url': ?imageUrl,
+      'supplier': ?supplier,
     };
 
     final result = await _client

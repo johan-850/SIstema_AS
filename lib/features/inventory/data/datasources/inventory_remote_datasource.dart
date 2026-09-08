@@ -97,7 +97,7 @@ class InventoryRemoteDatasource {
         .insert({
           'product_id': productId,
           'requested_by': userId,
-          if (notes != null) 'notes': notes,
+          'notes': ?notes,
         })
         .select('*, profiles(name)')
         .single();

@@ -17,6 +17,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/providers/scan_feedback_providers.dart';
 import '../../../../core/widgets/app_snackbar.dart';
 import '../../../../core/widgets/barcode_scanner_page.dart';
 import '../providers/product_providers.dart';
@@ -468,13 +469,24 @@ class _ProductFormPageState extends ConsumerState<ProductFormPage> {
     final result =
         await ref.read(getProductByBarcodeUseCaseProvider)(code);
     if (!mounted) return;
+
+    final feedback = ref.read(scanFeedbackProvider);
     final found = result.product;
+
+    // US-057: el código duplicado es el caso que el usuario necesita
+    // notar — se le avisa también con sonido/vibración de error, no
+    // solo con un snackbar que puede pasar desapercibido.
     if (found != null && found.id != _existingProduct?.id) {
+      await feedback.failure();
+      if (!mounted) return;
       AppSnackbar.warning(
         context,
         'Este código ya pertenece a "${found.name}".',
       );
+      return;
     }
+
+    await feedback.success();
   }
 
   // ── Foto de producto ──────────────────────────────────────────

@@ -26,6 +26,7 @@ import '../../features/expenses/presentation/pages/expenses_report_admin_page.da
 import '../../features/dashboard/presentation/pages/sales_history_page.dart';
 import '../../features/dashboard/presentation/pages/sale_detail_page.dart';
 import '../../features/dashboard/presentation/pages/sales_statistics_page.dart';
+import '../../features/alerts/presentation/pages/alert_center_page.dart';
 
 // ── Rutas nombradas ─────────────────────────────────────────
 abstract class AppRoutes {
@@ -43,8 +44,8 @@ abstract class AppRoutes {
   static const createCashier        = '/admin/users/create';
   static const cashierDetail        = '/admin/users/:id';
   static const settings             = '/settings';
-  static const reports              = '/admin/reports';
   static const analytics            = '/admin/analytics';
+  static const alerts               = '/admin/alerts';           // US-061
   static const posExpenses          = '/pos/expenses';           // US-035
   static const expensesReport       = '/admin/expenses';         // US-037
   static const expenseCategories    = '/admin/expenses/categories'; // US-036
@@ -210,6 +211,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: AppRoutes.analytics,
         name: 'sales-statistics',
         builder: (_, _) => const SalesStatisticsPage(),
+      ),
+      // EP-11 (US-061): Centro de alertas
+      GoRoute(
+        path: AppRoutes.alerts,
+        name: 'alert-center',
+        builder: (_, _) => const AlertCenterPage(),
       ),
     ],
 

@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/providers/auth_providers.dart';
 import '../../../pos/presentation/providers/sales_history_providers.dart';
+import '../../../alerts/presentation/providers/alert_providers.dart';
 import '../../../../core/utils/receipt_pdf.dart' show paymentMethodLabel;
 
 /// Dashboard principal del AdminMaster — US-048 (base)
@@ -91,6 +92,7 @@ class AdminDashboardPage extends ConsumerWidget {
                     onTap: () => context.push('/admin/sales-history')),
                 _ModuleCard(icon: Icons.analytics_rounded, label: 'Estadísticas', color: AppColors.accent,
                     onTap: () => context.push('/admin/analytics')),
+                _AlertsModuleCard(onTap: () => context.push('/admin/alerts')),
                 _ModuleCard(icon: Icons.settings_outlined, label: 'Configuración', color: AppColors.textSecondary,
                     onTap: () => context.push('/settings')),
               ],
@@ -277,6 +279,46 @@ class _ModuleCard extends StatelessWidget {
   }
 }
 
+/// US-061: igual que _ModuleCard pero con el número de alertas sin
+/// revisar. Un centro de alertas al que hay que entrar para saber si
+/// tiene algo no lo abre nadie.
+class _AlertsModuleCard extends ConsumerWidget {
+  final VoidCallback onTap;
+  const _AlertsModuleCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(unreviewedAlertCountProvider).valueOrNull ?? 0;
+
+    return Stack(
+      children: [
+        _ModuleCard(
+          icon: Icons.notifications_active_outlined,
+          label: 'Alertas',
+          color: AppColors.error,
+          onTap: onTap,
+        ),
+        if (count > 0)
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.error,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                count > 99 ? '99+' : '$count',
+                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _AdminDrawer extends StatelessWidget {
   final String userName;
   const _AdminDrawer({required this.userName});
@@ -310,6 +352,7 @@ class _AdminDrawer extends StatelessWidget {
                   const _DrawerSectionLabel('Reportes'),
                   _drawerItem(context, Icons.receipt_long_rounded, 'Historial de ventas', '/admin/sales-history'),
                   _drawerItem(context, Icons.analytics_rounded, 'Estadísticas', '/admin/analytics'),
+                  _drawerItem(context, Icons.notifications_active_outlined, 'Centro de alertas', '/admin/alerts'),
                 ],
 
               ),

@@ -76,7 +76,7 @@ class _ActiveRegisterScaffold extends ConsumerWidget {
 
     // Caja en 'closing': el cajero empezó el cierre y no lo terminó.
     // Hay que dejarlo retomarlo, no mandarlo a vender otra vez.
-    final bool isClosing = register.isClosing as bool;
+    final bool isClosing = register.isClosing;
 
     return Scaffold(
       body: SafeArea(

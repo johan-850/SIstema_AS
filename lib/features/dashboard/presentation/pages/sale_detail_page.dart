@@ -132,10 +132,18 @@ class _SaleDetailBody extends ConsumerWidget {
       createdAt: sale.createdAt,
       total: sale.total,
       paymentMethod: sale.paymentMethod,
-      items: items.map((i) => (name: i.productName, quantity: i.quantity, subtotal: i.subtotal)).toList(),
+      items: items
+          .map((i) => (
+                name: i.productName,
+                quantity: i.quantity,
+                subtotal: i.subtotal,
+                discount: i.discountAmount,
+              ))
+          .toList(),
       cashAmount: sale.cashAmount,
       transferAmount: sale.transferAmount,
       changeAmount: sale.changeAmount,
+      globalDiscount: sale.discountAmount,
     );
     final xFile = XFile.fromData(bytes, name: 'recibo_${sale.id}.pdf', mimeType: 'application/pdf');
     await Share.shareXFiles([xFile], text: 'Recibo de venta — Abarrotería Pro');

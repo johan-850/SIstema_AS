@@ -83,6 +83,8 @@ class SettingsPage extends ConsumerWidget {
             const _CashClosingSettingsCard(),
             const SizedBox(height: 16),
             const _WeeklyReportSettingsCard(),
+            const SizedBox(height: 16),
+            const _DiscountSettingsCard(),
           ],
 
           // ── Escaneo (US-057) ───────────────────────────────
@@ -798,5 +800,202 @@ class _ScanFeedbackSettingsCard extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+/// US-029: umbral de descuento y PIN de autorización.
+///
+/// El PIN nunca se muestra ni se puede consultar: la app solo sabe si
+/// existe o no. Se guarda hasheado del lado del servidor, en una tabla
+/// que ningún cliente puede leer.
+class _DiscountSettingsCard extends ConsumerStatefulWidget {
+  const _DiscountSettingsCard();
+
+  @override
+  ConsumerState<_DiscountSettingsCard> createState() => _DiscountSettingsCardState();
+}
+
+class _DiscountSettingsCardState extends ConsumerState<_DiscountSettingsCard> {
+  final _thresholdCtrl = TextEditingController();
+  final _pinCtrl = TextEditingController();
+  bool _isSavingThreshold = false;
+  bool _isSavingPin = false;
+  bool _initialized = false;
+
+  @override
+  void dispose() {
+    _thresholdCtrl.dispose();
+    _pinCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settingsAsync = ref.watch(storeSettingsProvider);
+    final hasPinAsync = ref.watch(hasDiscountPinProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.local_offer_outlined, color: AppColors.primary, size: 20),
+              SizedBox(width: 8),
+              Text('Descuentos',
+                  style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 15)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Porcentaje de descuento a partir del cual el cajero necesita tu autorización para cobrar.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+          ),
+          const SizedBox(height: 14),
+          settingsAsync.when(
+            loading: () => const Center(
+              child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(color: AppColors.primary)),
+            ),
+            error: (_, _) => const Text('No se pudo cargar la configuración.',
+                style: TextStyle(color: AppColors.error, fontSize: 13)),
+            data: (settings) {
+              if (!_initialized) {
+                _thresholdCtrl.text =
+                    (settings?.discountPinThresholdPercent ?? 10).toStringAsFixed(0);
+                _initialized = true;
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: _thresholdCtrl,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    style: const TextStyle(color: AppColors.textPrimary),
+                    decoration: const InputDecoration(
+                      labelText: 'Umbral de autorización (%)',
+                      prefixIcon: Icon(Icons.percent_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isSavingThreshold ? null : _saveThreshold,
+                      child: _isSavingThreshold
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                            )
+                          : const Text('Guardar umbral'),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          const Divider(height: 32, color: AppColors.border),
+          Row(
+            children: [
+              const Icon(Icons.pin_rounded, color: AppColors.textSecondary, size: 18),
+              const SizedBox(width: 8),
+              const Text('PIN de autorización',
+                  style: TextStyle(color: AppColors.textPrimary, fontSize: 14)),
+              const Spacer(),
+              hasPinAsync.when(
+                loading: () => const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                ),
+                error: (_, _) => const SizedBox.shrink(),
+                data: (hasPin) => Text(
+                  hasPin ? 'Configurado' : 'Sin configurar',
+                  style: TextStyle(
+                    color: hasPin ? AppColors.success : AppColors.warning,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: _pinCtrl,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            style: const TextStyle(color: AppColors.textPrimary, letterSpacing: 4),
+            decoration: const InputDecoration(
+              labelText: 'Nuevo PIN (mínimo 4 dígitos)',
+              prefixIcon: Icon(Icons.lock_outline_rounded),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: _isSavingPin ? null : _savePin,
+              child: _isSavingPin
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                    )
+                  : const Text('Guardar PIN'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveThreshold() async {
+    final percent = double.tryParse(_thresholdCtrl.text);
+    if (percent == null || percent < 0 || percent > 100) {
+      AppSnackbar.error(context, 'Ingresa un porcentaje entre 0 y 100.');
+      return;
+    }
+
+    setState(() => _isSavingThreshold = true);
+    final result = await ref.read(updateDiscountThresholdUseCaseProvider)(percent);
+    if (!mounted) return;
+    setState(() => _isSavingThreshold = false);
+
+    if (result.failure != null) {
+      AppSnackbar.error(context, result.failure!.message);
+      return;
+    }
+    ref.invalidate(storeSettingsProvider);
+    AppSnackbar.success(context, 'Umbral guardado');
+  }
+
+  Future<void> _savePin() async {
+    final pin = _pinCtrl.text.trim();
+    if (pin.length < 4) {
+      AppSnackbar.error(context, 'El PIN debe tener al menos 4 dígitos.');
+      return;
+    }
+
+    setState(() => _isSavingPin = true);
+    final failure = await ref.read(setDiscountPinUseCaseProvider)(pin);
+    if (!mounted) return;
+    setState(() => _isSavingPin = false);
+
+    if (failure != null) {
+      AppSnackbar.error(context, failure.message);
+      return;
+    }
+    _pinCtrl.clear();
+    ref.invalidate(hasDiscountPinProvider);
+    AppSnackbar.success(context, 'PIN guardado');
   }
 }

@@ -16,6 +16,7 @@ import '../../../settings/presentation/providers/store_settings_providers.dart';
 import '../../domain/entities/cart_item.dart';
 import '../providers/cart_providers.dart';
 import '../providers/checkout_provider.dart';
+import '../widgets/discount_pin_dialog.dart';
 import 'receipt_page.dart';
 
 class CheckoutPage extends ConsumerStatefulWidget {
@@ -234,7 +235,7 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                 child: ElevatedButton.icon(
                   onPressed: (!canConfirm || checkout.isLoading)
                       ? null
-                      : () => checkoutNotifier.confirm(cashRegisterId: register.id, items: cart.items),
+                      : () => _confirmSale(checkoutNotifier, register.id, cart),
                   icon: checkout.isLoading
                       ? const SizedBox(
                           width: 20,
@@ -249,6 +250,38 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
           );
         },
       ),
+    );
+  }
+
+  /// US-029: si el descuento supera el umbral configurado se pide el PIN
+  /// del AdminMaster antes de cobrar.
+  ///
+  /// Este chequeo es solo para dar el aviso a tiempo y no mandar una
+  /// venta que va a ser rechazada: la validación real ocurre dentro de
+  /// confirm_sale, en el servidor. Si alguien salteara esta pantalla, la
+  /// base de datos rechazaría la venta igual.
+  Future<void> _confirmSale(
+    CheckoutNotifier notifier,
+    String registerId,
+    CartState cart,
+  ) async {
+    String? pin;
+
+    if (cart.hasDiscount) {
+      final threshold =
+          ref.read(storeSettingsProvider).valueOrNull?.discountPinThresholdPercent ?? 10;
+
+      if (cart.discountPercent > threshold) {
+        pin = await DiscountPinDialog.show(context, discountPercent: cart.discountPercent);
+        if (pin == null) return; // canceló la autorización
+      }
+    }
+
+    await notifier.confirm(
+      cashRegisterId: registerId,
+      items: cart.items,
+      globalDiscount: cart.globalDiscount,
+      discountPin: pin,
     );
   }
 }

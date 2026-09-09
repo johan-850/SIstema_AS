@@ -77,6 +77,11 @@ abstract class SaleRepository {
   /// US-030/US-031/US-032: confirma el cobro de una venta de forma
   /// atómica (vía función RPC en Supabase) — crea la venta, sus
   /// ítems y descuenta el stock correspondiente.
+  ///
+  /// US-029: [globalDiscount] es el descuento sobre el total (los de cada
+  /// ítem viajan dentro de [items]). [discountPin] solo hace falta si el
+  /// descuento supera el umbral configurado; quien lo valida es la
+  /// función del servidor, no el cliente.
   Future<SaleResult> confirmSale({
     required String cashRegisterId,
     required String paymentMethod,
@@ -84,6 +89,8 @@ abstract class SaleRepository {
     double? transferAmount,
     required List<CartItem> items,
     String? receiptPhotoUrl,
+    double globalDiscount,
+    String? discountPin,
   });
 
   /// Sube la foto del comprobante de transferencia y devuelve su URL

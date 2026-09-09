@@ -39,4 +39,14 @@ abstract class StoreSettingsRepository {
 
   /// EP-09 (US-054): envío de prueba inmediato, ignora el toggle activo/inactivo.
   Future<Failure?> sendWeeklyReportNow();
+
+  /// EP-05 (US-029): porcentaje de descuento que exige PIN.
+  Future<StoreSettingsResult> updateDiscountThreshold(double percent);
+
+  /// US-029: guarda el PIN de autorización de descuentos (hasheado en el
+  /// servidor; nunca viaja ni se guarda en claro).
+  Future<Failure?> setDiscountPin(String pin);
+
+  /// US-029: si hay un PIN configurado. Nunca devuelve el PIN ni su hash.
+  Future<({bool hasPin, Failure? failure})> hasDiscountPin();
 }

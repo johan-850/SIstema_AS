@@ -22,6 +22,8 @@ class ConfirmSaleUseCase {
     double? transferAmount,
     required List<CartItem> items,
     String? receiptPhotoUrl,
+    double globalDiscount = 0,
+    String? discountPin,
   }) =>
       _repository.confirmSale(
         cashRegisterId: cashRegisterId,
@@ -30,6 +32,8 @@ class ConfirmSaleUseCase {
         transferAmount: transferAmount,
         items: items,
         receiptPhotoUrl: receiptPhotoUrl,
+        globalDiscount: globalDiscount,
+        discountPin: discountPin,
       );
 }
 

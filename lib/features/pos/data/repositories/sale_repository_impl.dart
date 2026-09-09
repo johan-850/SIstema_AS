@@ -39,6 +39,8 @@ class SaleRepositoryImpl implements SaleRepository {
     double? transferAmount,
     required List<CartItem> items,
     String? receiptPhotoUrl,
+    double globalDiscount = 0,
+    String? discountPin,
   }) async {
     try {
       final sale = await _datasource.confirmSale(
@@ -48,6 +50,8 @@ class SaleRepositoryImpl implements SaleRepository {
         transferAmount: transferAmount,
         items: items,
         receiptPhotoUrl: receiptPhotoUrl,
+        globalDiscount: globalDiscount,
+        discountPin: discountPin,
       );
       return (sale: sale, failure: null);
     } catch (e) {

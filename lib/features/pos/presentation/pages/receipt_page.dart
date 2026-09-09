@@ -132,8 +132,14 @@ class ReceiptPage extends StatelessWidget {
     );
   }
 
-  List<ReceiptLineItem> get _lineItems =>
-      items.map((i) => (name: i.name, quantity: i.quantity, subtotal: i.subtotal)).toList();
+  List<ReceiptLineItem> get _lineItems => items
+      .map((i) => (
+            name: i.name,
+            quantity: i.quantity,
+            subtotal: i.subtotal,
+            discount: i.discountAmount,
+          ))
+      .toList();
 
   Future<Uint8List> _buildPdfBytes() => buildReceiptPdfBytes(
         saleId: sale.id,
@@ -144,6 +150,7 @@ class ReceiptPage extends StatelessWidget {
         cashAmount: sale.cashAmount,
         transferAmount: sale.transferAmount,
         changeAmount: sale.changeAmount,
+        globalDiscount: sale.discountAmount,
       );
 
   Future<void> _sharePdf() async {

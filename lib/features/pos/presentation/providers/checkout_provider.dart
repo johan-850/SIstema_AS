@@ -142,7 +142,15 @@ class CheckoutNotifier extends StateNotifier<CheckoutState> {
     }
   }
 
-  Future<bool> confirm({required String cashRegisterId, required List<CartItem> items}) async {
+  /// US-029: [globalDiscount] y [discountPin] vienen del carrito y del
+  /// diálogo de autorización. Si el PIN es incorrecto, quien rechaza la
+  /// venta es confirm_sale en el servidor y el error llega como Failure.
+  Future<bool> confirm({
+    required String cashRegisterId,
+    required List<CartItem> items,
+    double globalDiscount = 0,
+    String? discountPin,
+  }) async {
     state = state.copyWith(isLoading: true, clearFailure: true);
 
     final result = await _confirmSale(
@@ -152,6 +160,8 @@ class CheckoutNotifier extends StateNotifier<CheckoutState> {
       transferAmount: state.transferAmount,
       items: items,
       receiptPhotoUrl: state.receiptPhotoUrl,
+      globalDiscount: globalDiscount,
+      discountPin: discountPin,
     );
 
     if (result.failure != null) {

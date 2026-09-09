@@ -68,3 +68,28 @@ class SendWeeklyReportNowUseCase {
 
   Future<Failure?> call() => _repository.sendWeeklyReportNow();
 }
+
+/// EP-05 (US-029): umbral de descuento que exige autorización.
+class UpdateDiscountThresholdUseCase {
+  final StoreSettingsRepository _repository;
+  const UpdateDiscountThresholdUseCase(this._repository);
+
+  Future<StoreSettingsResult> call(double percent) =>
+      _repository.updateDiscountThreshold(percent);
+}
+
+/// US-029: fija el PIN de autorización de descuentos.
+class SetDiscountPinUseCase {
+  final StoreSettingsRepository _repository;
+  const SetDiscountPinUseCase(this._repository);
+
+  Future<Failure?> call(String pin) => _repository.setDiscountPin(pin);
+}
+
+/// US-029: consulta si ya hay un PIN configurado.
+class HasDiscountPinUseCase {
+  final StoreSettingsRepository _repository;
+  const HasDiscountPinUseCase(this._repository);
+
+  Future<({bool hasPin, Failure? failure})> call() => _repository.hasDiscountPin();
+}

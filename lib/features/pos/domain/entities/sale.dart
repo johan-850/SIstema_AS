@@ -32,6 +32,15 @@ class Sale extends Equatable {
   /// cualquier otro contexto (ej. el que devuelve confirm_sale).
   final List<String> itemsPreview;
 
+  /// US-029: descuento global de la venta, en pesos. No incluye los
+  /// descuentos por ítem, que viven en cada SaleItem. [total] ya es el
+  /// neto, con todos los descuentos aplicados.
+  final double discountAmount;
+
+  /// US-029: TRUE si el descuento superó el umbral configurado y se
+  /// validó con el PIN del AdminMaster. Es el registro de autorización.
+  final bool discountAuthorized;
+
   final DateTime createdAt;
 
   const Sale({
@@ -47,6 +56,8 @@ class Sale extends Equatable {
     this.cashRegisterId,
     this.status = 'completed',
     this.itemsPreview = const [],
+    this.discountAmount = 0,
+    this.discountAuthorized = false,
     required this.createdAt,
   });
 

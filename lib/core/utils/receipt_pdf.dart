@@ -12,7 +12,10 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
-typedef ReceiptLineItem = ({String name, int quantity, double subtotal});
+/// [subtotal] es el bruto (cantidad × precio); [discount] es lo que se
+/// rebajó de ese ítem. El recibo muestra ambos para que el cliente vea
+/// el precio original y el ahorro (US-029).
+typedef ReceiptLineItem = ({String name, int quantity, double subtotal, double discount});
 
 String paymentMethodLabel(String method) => switch (method) {
       'efectivo' => 'Efectivo',
@@ -30,11 +33,19 @@ Future<Uint8List> buildReceiptPdfBytes({
   double? cashAmount,
   double? transferAmount,
   double? changeAmount,
+  double globalDiscount = 0,
 }) async {
   final currencyFmt = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
   final dateFmt = DateFormat('dd/MM/yyyy hh:mm a', 'es');
   final isCash = paymentMethod == 'efectivo';
   final isMixed = paymentMethod == 'mixto';
+
+  // US-029: el bruto se recalcula sumando los ítems, no se recibe, para
+  // que el recibo no pueda contradecir sus propias líneas.
+  final gross = items.fold(0.0, (sum, i) => sum + i.subtotal);
+  final itemDiscounts = items.fold(0.0, (sum, i) => sum + i.discount);
+  final totalDiscount = itemDiscounts + globalDiscount;
+  final hasDiscount = totalDiscount > 0;
 
   final doc = pw.Document();
   doc.addPage(
@@ -53,17 +64,49 @@ Future<Uint8List> buildReceiptPdfBytes({
           pw.Divider(),
           ...items.map((i) => pw.Padding(
                 padding: const pw.EdgeInsets.symmetric(vertical: 2),
-                child: pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Expanded(
-                      child: pw.Text('${i.name} x${i.quantity}', style: const pw.TextStyle(fontSize: 8)),
+                    pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                      children: [
+                        pw.Expanded(
+                          child: pw.Text('${i.name} x${i.quantity}', style: const pw.TextStyle(fontSize: 8)),
+                        ),
+                        pw.Text(currencyFmt.format(i.subtotal), style: const pw.TextStyle(fontSize: 8)),
+                      ],
                     ),
-                    pw.Text(currencyFmt.format(i.subtotal), style: const pw.TextStyle(fontSize: 8)),
+                    if (i.discount > 0)
+                      pw.Row(
+                        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                        children: [
+                          pw.Text('  Descuento', style: const pw.TextStyle(fontSize: 7)),
+                          pw.Text('-${currencyFmt.format(i.discount)}', style: const pw.TextStyle(fontSize: 7)),
+                        ],
+                      ),
                   ],
                 ),
               )),
           pw.Divider(),
+          // US-029: subtotal y descuento solo aparecen si hubo rebaja —
+          // en una venta sin descuento el recibo queda igual que antes.
+          if (hasDiscount) ...[
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Subtotal', style: const pw.TextStyle(fontSize: 8)),
+                pw.Text(currencyFmt.format(gross), style: const pw.TextStyle(fontSize: 8)),
+              ],
+            ),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Descuento', style: const pw.TextStyle(fontSize: 8)),
+                pw.Text('-${currencyFmt.format(totalDiscount)}', style: const pw.TextStyle(fontSize: 8)),
+              ],
+            ),
+            pw.SizedBox(height: 2),
+          ],
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [

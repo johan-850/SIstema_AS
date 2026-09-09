@@ -25,6 +25,10 @@ class CartItem extends Equatable {
   /// cerca está de agotarse a medida que cambia la cantidad en el carrito.
   final int minStock;
 
+  /// US-029: descuento aplicado a este ítem, en pesos. Nunca supera
+  /// [subtotal] — se valida tanto acá como en confirm_sale.
+  final double discountAmount;
+
   const CartItem({
     required this.productId,
     required this.name,
@@ -35,15 +39,22 @@ class CartItem extends Equatable {
     required this.quantity,
     required this.availableStock,
     this.minStock = 0,
+    this.discountAmount = 0,
   });
 
+  /// Bruto: cantidad × precio, sin descuento. Mantiene el mismo
+  /// significado que tenía antes de US-029 y que el que guarda
+  /// sale_items.subtotal en la base de datos.
   double get subtotal => unitPrice * quantity;
+
+  /// Lo que realmente aporta este ítem al total de la venta.
+  double get netSubtotal => subtotal - discountAmount;
 
   /// Stock que quedaría del producto si se confirmara la venta con la
   /// cantidad actual del carrito.
   int get remainingStock => availableStock - quantity;
 
-  CartItem copyWith({int? quantity}) => CartItem(
+  CartItem copyWith({int? quantity, double? discountAmount}) => CartItem(
         productId: productId,
         name: name,
         barcode: barcode,
@@ -53,8 +64,12 @@ class CartItem extends Equatable {
         quantity: quantity ?? this.quantity,
         availableStock: availableStock,
         minStock: minStock,
+        discountAmount: discountAmount ?? this.discountAmount,
       );
 
+  /// discountAmount va incluido a propósito: sin él, dos ítems que solo
+  /// difieran en el descuento se considerarían iguales y la interfaz no
+  /// se reconstruiría al cambiarlo.
   @override
-  List<Object?> get props => [productId, quantity];
+  List<Object?> get props => [productId, quantity, discountAmount];
 }

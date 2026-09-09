@@ -105,4 +105,33 @@ class StoreSettingsRepositoryImpl implements StoreSettingsRepository {
       return _mapException(e);
     }
   }
+
+  @override
+  Future<StoreSettingsResult> updateDiscountThreshold(double percent) async {
+    try {
+      final settings = await _datasource.updateDiscountThreshold(percent);
+      return (settings: settings, failure: null);
+    } catch (e) {
+      return (settings: null, failure: _mapException(e));
+    }
+  }
+
+  @override
+  Future<Failure?> setDiscountPin(String pin) async {
+    try {
+      await _datasource.setDiscountPin(pin);
+      return null;
+    } catch (e) {
+      return _mapException(e);
+    }
+  }
+
+  @override
+  Future<({bool hasPin, Failure? failure})> hasDiscountPin() async {
+    try {
+      return (hasPin: await _datasource.hasDiscountPin(), failure: null);
+    } catch (e) {
+      return (hasPin: false, failure: _mapException(e));
+    }
+  }
 }

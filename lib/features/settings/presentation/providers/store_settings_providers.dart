@@ -49,6 +49,25 @@ final sendWeeklyReportNowUseCaseProvider = Provider(
   (ref) => SendWeeklyReportNowUseCase(ref.read(storeSettingsRepositoryProvider)),
 );
 
+final updateDiscountThresholdUseCaseProvider = Provider(
+  (ref) => UpdateDiscountThresholdUseCase(ref.read(storeSettingsRepositoryProvider)),
+);
+
+final setDiscountPinUseCaseProvider = Provider(
+  (ref) => SetDiscountPinUseCase(ref.read(storeSettingsRepositoryProvider)),
+);
+
+final hasDiscountPinUseCaseProvider = Provider(
+  (ref) => HasDiscountPinUseCase(ref.read(storeSettingsRepositoryProvider)),
+);
+
+/// US-029: si hay PIN configurado. Se relee con `ref.invalidate` tras
+/// guardarlo desde Configuración.
+final hasDiscountPinProvider = FutureProvider<bool>((ref) async {
+  final result = await ref.read(hasDiscountPinUseCaseProvider)();
+  return result.hasPin;
+});
+
 // ── Lectura ─────────────────────────────────────────────────────
 
 /// Configuración del negocio (hoy: solo el QR de pago). Se relee con

@@ -17,6 +17,7 @@ import '../../../cash_register/presentation/providers/cash_register_providers.da
 import '../../domain/entities/cart_item.dart';
 import '../providers/cart_providers.dart';
 import '../providers/checkout_provider.dart' show logCancelledSaleUseCaseProvider;
+import '../widgets/discount_dialog.dart';
 import 'checkout_page.dart';
 
 class CartPage extends ConsumerWidget {
@@ -67,6 +68,7 @@ class CartPage extends ConsumerWidget {
                     }
                   },
                   onRemove: () => _confirmRemove(context, notifier, item),
+                  onDiscount: () => _applyItemDiscount(context, notifier, item),
                 );
               },
             ),
@@ -82,6 +84,30 @@ class CartPage extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // US-029: subtotal y descuento solo se muestran si hay
+                    // rebaja — una venta normal se ve igual que antes.
+                    if (state.hasDiscount) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Subtotal',
+                              style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                          Text(currencyFmt.format(state.grossAmount),
+                              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Descuento (${state.discountPercent.toStringAsFixed(1)}%)',
+                              style: const TextStyle(color: AppColors.warning, fontSize: 13)),
+                          Text('-${currencyFmt.format(state.discountTotal)}',
+                              style: const TextStyle(color: AppColors.warning, fontSize: 13)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -96,7 +122,18 @@ class CartPage extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () => _applyGlobalDiscount(context, notifier, state),
+                        icon: const Icon(Icons.local_offer_outlined, size: 18),
+                        label: Text(state.globalDiscount > 0
+                            ? 'Descuento de venta: -${currencyFmt.format(state.globalDiscount)}'
+                            : 'Aplicar descuento a la venta'),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
                         Expanded(
@@ -177,6 +214,39 @@ class CartPage extends ConsumerWidget {
       },
     );
   }
+
+  /// US-029: descuento sobre un ítem. El tope es su propio subtotal.
+  Future<void> _applyItemDiscount(
+    BuildContext context,
+    CartNotifier notifier,
+    CartItem item,
+  ) async {
+    final amount = await DiscountDialog.show(
+      context,
+      baseAmount: item.subtotal,
+      currentDiscount: item.discountAmount,
+      title: 'Descuento — ${item.name}',
+    );
+    if (amount == null) return;
+    notifier.setItemDiscount(item.productId, amount);
+  }
+
+  /// US-029: descuento sobre la venta completa. El tope es lo que queda
+  /// tras los descuentos por ítem, para no dejar el total negativo.
+  Future<void> _applyGlobalDiscount(
+    BuildContext context,
+    CartNotifier notifier,
+    CartState state,
+  ) async {
+    final amount = await DiscountDialog.show(
+      context,
+      baseAmount: state.maxGlobalDiscount,
+      currentDiscount: state.globalDiscount,
+      title: 'Descuento de la venta',
+    );
+    if (amount == null) return;
+    notifier.setGlobalDiscount(amount);
+  }
 }
 
 class _CartItemTile extends StatefulWidget {
@@ -186,6 +256,7 @@ class _CartItemTile extends StatefulWidget {
   final VoidCallback onDecrement;
   final ValueChanged<int> onQuantityChanged;
   final VoidCallback onRemove;
+  final VoidCallback onDiscount;
 
   const _CartItemTile({
     required this.item,
@@ -194,6 +265,7 @@ class _CartItemTile extends StatefulWidget {
     required this.onDecrement,
     required this.onQuantityChanged,
     required this.onRemove,
+    required this.onDiscount,
   });
 
   @override
@@ -318,16 +390,56 @@ class _CartItemTileState extends State<_CartItemTile> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text(
-                widget.currencyFmt.format(widget.item.subtotal),
-                style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-              IconButton(
-                tooltip: 'Eliminar',
-                icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 20),
-                onPressed: widget.onRemove,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+              // US-029: con descuento se tacha el bruto y se muestra el
+              // neto debajo, para que el cajero pueda verificar de un
+              // vistazo que la rebaja quedó bien aplicada.
+              if (widget.item.discountAmount > 0) ...[
+                Text(
+                  widget.currencyFmt.format(widget.item.subtotal),
+                  style: const TextStyle(
+                    color: AppColors.textDisabled,
+                    fontSize: 12,
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                ),
+                Text(
+                  widget.currencyFmt.format(widget.item.netSubtotal),
+                  style: const TextStyle(
+                      color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                Text(
+                  '-${widget.currencyFmt.format(widget.item.discountAmount)}',
+                  style: const TextStyle(color: AppColors.warning, fontSize: 11),
+                ),
+              ] else
+                Text(
+                  widget.currencyFmt.format(widget.item.subtotal),
+                  style: const TextStyle(
+                      color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Descuento',
+                    icon: Icon(
+                      Icons.local_offer_outlined,
+                      color: widget.item.discountAmount > 0 ? AppColors.warning : AppColors.textSecondary,
+                      size: 20,
+                    ),
+                    onPressed: widget.onDiscount,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 12),
+                  IconButton(
+                    tooltip: 'Eliminar',
+                    icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error, size: 20),
+                    onPressed: widget.onRemove,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
               ),
             ],
           ),

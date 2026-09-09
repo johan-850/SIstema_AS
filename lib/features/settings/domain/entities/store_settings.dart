@@ -25,6 +25,12 @@ class StoreSettings extends Equatable {
   final bool weeklyReportEnabled;
   final String? weeklyReportEmail;
 
+  /// EP-05 (US-029): porcentaje de descuento a partir del cual el cobro
+  /// exige el PIN del AdminMaster. El PIN en sí NO vive acá — esta fila
+  /// la puede leer cualquier cajero, así que el hash está en una tabla
+  /// aparte sin acceso desde el cliente.
+  final double discountPinThresholdPercent;
+
   const StoreSettings({
     this.qrImageUrl,
     this.maxExpenseAmount,
@@ -32,6 +38,7 @@ class StoreSettings extends Equatable {
     this.cashDiffCommentThreshold = 5000,
     this.weeklyReportEnabled = false,
     this.weeklyReportEmail,
+    this.discountPinThresholdPercent = 10,
   });
 
   bool get hasQrImage => qrImageUrl != null && qrImageUrl!.isNotEmpty;
@@ -44,5 +51,6 @@ class StoreSettings extends Equatable {
         cashDiffCommentThreshold,
         weeklyReportEnabled,
         weeklyReportEmail,
+        discountPinThresholdPercent,
       ];
 }

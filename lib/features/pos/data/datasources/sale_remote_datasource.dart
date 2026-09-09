@@ -49,6 +49,10 @@ class SaleRemoteDatasource {
       cashRegisterId: json['cash_register_id'] as String?,
       status: json['status'] as String? ?? 'completed',
       itemsPreview: itemsPreview,
+      // Con ?? 0 / ?? false para que las ventas anteriores a US-029 se
+      // lean sin problema aunque la consulta no pida esas columnas.
+      discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0,
+      discountAuthorized: json['discount_authorized'] as bool? ?? false,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
@@ -61,9 +65,14 @@ class SaleRemoteDatasource {
         quantity: (json['quantity'] as num).toInt(),
         unitPrice: (json['unit_price'] as num).toDouble(),
         subtotal: (json['subtotal'] as num).toDouble(),
+        discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0,
         isProductArchived: isArchived,
       );
 
+  /// US-029: [globalDiscount] y [discountPin] son opcionales. El PIN solo
+  /// hace falta si el descuento supera el umbral configurado, y quien lo
+  /// valida es confirm_sale del lado del servidor — mandarlo desde acá es
+  /// solo el transporte, no el control.
   Future<Sale> confirmSale({
     required String cashRegisterId,
     required String paymentMethod,
@@ -71,6 +80,8 @@ class SaleRemoteDatasource {
     double? transferAmount,
     required List<CartItem> items,
     String? receiptPhotoUrl,
+    double globalDiscount = 0,
+    String? discountPin,
   }) async {
     final response = await _client.rpc(AppConstants.rpcConfirmSale, params: {
       'p_cash_register_id': cashRegisterId,
@@ -83,9 +94,12 @@ class SaleRemoteDatasource {
                 'quantity': i.quantity,
                 'unit_price': i.unitPrice,
                 'product_name': i.name,
+                'discount': i.discountAmount,
               })
           .toList(),
       'p_receipt_photo_url': receiptPhotoUrl,
+      'p_discount_amount': globalDiscount,
+      'p_discount_pin': discountPin,
     });
 
     return _fromJson(response as Map<String, dynamic>);

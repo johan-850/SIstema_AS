@@ -23,6 +23,8 @@ class StoreSettingsRemoteDatasource {
             (json['cash_diff_comment_threshold'] as num?)?.toDouble() ?? 5000,
         weeklyReportEnabled: json['weekly_report_enabled'] as bool? ?? false,
         weeklyReportEmail: json['weekly_report_email'] as String?,
+        discountPinThresholdPercent:
+            (json['discount_pin_threshold_percent'] as num?)?.toDouble() ?? 10,
       );
 
   Future<StoreSettings> getSettings() async {
@@ -117,6 +119,34 @@ class StoreSettingsRemoteDatasource {
         .select()
         .single();
     return _fromJson(result);
+  }
+
+  /// EP-05 (US-029): umbral de descuento que exige PIN. Va en
+  /// store_settings porque no es información sensible.
+  Future<StoreSettings> updateDiscountThreshold(double percent) async {
+    final result = await _client
+        .from(AppConstants.tableStoreSettings)
+        .update({
+          'discount_pin_threshold_percent': percent,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', 1)
+        .select()
+        .single();
+    return _fromJson(result);
+  }
+
+  /// US-029: guarda el PIN hasheado. Pasa por una función SECURITY
+  /// DEFINER porque la tabla que lo almacena tiene RLS sin policies:
+  /// ningún cliente puede escribirla directamente, ni el AdminMaster.
+  Future<void> setDiscountPin(String pin) async {
+    await _client.rpc('set_discount_pin', params: {'p_pin': pin});
+  }
+
+  /// US-029: solo dice si hay PIN configurado; nunca expone el hash.
+  Future<bool> hasDiscountPin() async {
+    final result = await _client.rpc('has_discount_pin');
+    return result as bool? ?? false;
   }
 
   /// Invoca la Edge Function con `manual: true` — ignora el toggle

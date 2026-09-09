@@ -58,6 +58,9 @@ abstract class AppConstants {
   static const String tableExpenses          = 'expenses';
   static const String tableExpenseCategories = 'expense_categories';
 
+  // ── Tablas Supabase — EP-11 (Centro de alertas, US-061) ───
+  static const String tableAlertReviews      = 'alert_reviews';
+
   // ── Edge Functions ────────────────────────────────────────
   static const String fnCreateCashier        = 'create-cashier';
   static const String fnToggleCashierStatus  = 'toggle-cashier-status';

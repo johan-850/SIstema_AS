@@ -13,6 +13,7 @@ import '../../../../core/widgets/filter_dropdown.dart';
 import '../../../cash_register/domain/entities/cash_register.dart';
 import '../../../cash_register/presentation/providers/cash_register_providers.dart';
 import '../../../users/presentation/providers/users_providers.dart';
+import '../../../settings/presentation/providers/store_settings_providers.dart';
 
 class AdminCashRegistersPage extends ConsumerStatefulWidget {
   const AdminCashRegistersPage({super.key});
@@ -29,10 +30,16 @@ class _AdminCashRegistersPageState
   final _timeFmt     = DateFormat('hh:mm a', 'es');
   final _fullDateFmt = DateFormat('dd/MM/yyyy HH:mm', 'es');
 
+  /// Umbral configurado por el AdminMaster para considerar problemática
+  /// una diferencia de caja. Es el mismo que usa el cierre de caja.
+  double _diffThreshold = 5000;
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(registerHistoryProvider);
     final notifier = ref.read(registerHistoryProvider.notifier);
+    _diffThreshold =
+        ref.watch(storeSettingsProvider).valueOrNull?.cashDiffCommentThreshold ?? 5000;
 
     return Scaffold(
       appBar: AppBar(
@@ -65,6 +72,7 @@ class _AdminCashRegistersPageState
                       currencyFmt: _currencyFmt,
                       dateFmt: _dateFmt,
                       timeFmt: _timeFmt,
+                      diffThreshold: _diffThreshold,
                       onTap: () => _showDetailSheet(context, state.registers[i]),
                     ),
                   ),
@@ -180,6 +188,7 @@ class _AdminCashRegistersPageState
           register: register,
           currencyFmt: _currencyFmt,
           fullDateFmt: _fullDateFmt,
+          diffThreshold: _diffThreshold,
           scrollController: scrollCtrl,
         ),
       ),
@@ -189,11 +198,24 @@ class _AdminCashRegistersPageState
 
 // ── Tarjeta de apertura en lista ──────────────────────────────
 
+/// Color del indicador de diferencia de caja.
+///
+/// US-061: antes el umbral estaba hardcodeado en 5000 en dos lugares de
+/// este archivo, ignorando el `cash_diff_comment_threshold` que el
+/// AdminMaster configura en Ajustes. El resultado era que esta pantalla
+/// y el cierre de caja podían no coincidir sobre qué diferencia es un
+/// problema. Ahora las dos leen el mismo valor.
+Color cashDiffColor(double difference, double threshold) {
+  if (difference == 0) return AppColors.success;
+  return difference.abs() <= threshold ? AppColors.stockNearVivid : AppColors.stockCriticalVivid;
+}
+
 class _RegisterCard extends StatelessWidget {
   final CashRegister register;
   final NumberFormat currencyFmt;
   final DateFormat dateFmt;
   final DateFormat timeFmt;
+  final double diffThreshold;
   final VoidCallback onTap;
 
   const _RegisterCard({
@@ -201,6 +223,7 @@ class _RegisterCard extends StatelessWidget {
     required this.currencyFmt,
     required this.dateFmt,
     required this.timeFmt,
+    required this.diffThreshold,
     required this.onTap,
   });
 
@@ -314,11 +337,7 @@ class _RegisterCard extends StatelessWidget {
                   height: 10,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: register.closingSummary!.difference == 0
-                        ? AppColors.success
-                        : (register.closingSummary!.difference.abs() <= 5000
-                            ? AppColors.stockNearVivid
-                            : AppColors.stockCriticalVivid),
+                    color: cashDiffColor(register.closingSummary!.difference, diffThreshold),
                   ),
                 ),
               ),
@@ -339,12 +358,14 @@ class _RegisterDetailSheet extends StatelessWidget {
   final CashRegister register;
   final NumberFormat currencyFmt;
   final DateFormat fullDateFmt;
+  final double diffThreshold;
   final ScrollController scrollController;
 
   const _RegisterDetailSheet({
     required this.register,
     required this.currencyFmt,
     required this.fullDateFmt,
+    required this.diffThreshold,
     required this.scrollController,
   });
 
@@ -487,11 +508,7 @@ class _RegisterDetailSheet extends StatelessWidget {
                 Text(
                   '\$${currencyFmt.format(register.closingSummary!.difference)}',
                   style: TextStyle(
-                    color: register.closingSummary!.difference == 0
-                        ? AppColors.success
-                        : (register.closingSummary!.difference.abs() <= 5000
-                            ? AppColors.stockNearVivid
-                            : AppColors.stockCriticalVivid),
+                    color: cashDiffColor(register.closingSummary!.difference, diffThreshold),
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
